@@ -48,16 +48,21 @@ input,select{font:inherit;color:var(--fg);background:var(--card);border:1px soli
 #results .ri:last-child{border-bottom:0}
 
 /* hoja inferior */
+/* 3 estados: min (colapsada), mid (media), max (expandida, tope ~68% del alto visible).
+   El alto en px lo pone setSheet() según el estado; estos valores son el respaldo sin JS. */
 #sheet{position:fixed;left:0;right:0;bottom:0;z-index:700;background:var(--bg);border-radius:18px 18px 0 0;box-shadow:var(--sheet-shadow);
-  display:flex;flex-direction:column;transition:height .22s ease;height:42vh;padding-bottom:var(--sb)}
-#sheet.min{height:calc(96px + var(--sb))}
-#sheet.max{height:calc(100vh - var(--st) - 70px)}
-#grab{padding:8px 0 4px;display:grid;place-items:center;flex:none}
-#grab i{display:block;width:40px;height:5px;border-radius:3px;background:var(--line)}
-#head{padding:2px 16px 8px;flex:none;display:flex;align-items:center;gap:10px;min-height:40px}
+  display:flex;flex-direction:column;transition:height .22s ease;height:42vh;height:42dvh;padding-bottom:var(--sb);
+  max-height:calc(100vh - var(--st) - 120px);max-height:calc(100dvh - var(--st) - 120px)}
+#grab{position:relative;padding:7px 0 3px;display:flex;justify-content:center;align-items:center;flex:none;min-height:28px;touch-action:none;cursor:grab}
+#grab i{display:block;width:44px;height:5px;border-radius:3px;background:var(--mut);opacity:.45}
+#sheetBtn{position:absolute;right:10px;top:3px;height:28px;padding:0 10px 0 8px;border-radius:14px;font-size:12.5px;color:var(--fg);display:flex;align-items:center;gap:4px;background:var(--card);border:1px solid var(--line)}
+#sheetBtn svg{transition:transform .2s}
+#sheet.min #sheetBtn svg{transform:rotate(180deg)}
+#sheet.min #body{overflow:hidden}
+#head{padding:2px 16px 8px;flex:none;display:flex;align-items:center;gap:10px;min-height:40px;touch-action:pan-x}
 #head h2{margin:0;font-size:18px;font-weight:650;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #head .sub{font-size:12.5px;color:var(--mut);font-weight:400}
-#body{overflow:auto;flex:1;padding:0 12px 14px;-webkit-overflow-scrolling:touch}
+#body{overflow:auto;flex:1;min-height:0;padding:0 12px 14px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .iconbtn{width:36px;height:36px;border-radius:18px;display:grid;place-items:center;flex:none}
 .iconbtn:active{background:var(--card)}
 .star.on{color:#f59e0b}
@@ -128,15 +133,22 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
 .rbus .txt{font-size:12.5px;color:var(--fg);padding:6px 0}
 
 /* marcadores */
-.busmk{width:30px;height:30px;position:relative}
-.busmk .c{position:absolute;inset:3px;border-radius:12px;background:var(--mc,#0f766e);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 10px/1 sans-serif}
-.busmk .a{position:absolute;inset:0;transform-origin:50% 50%}
-.busmk .a:before{content:"";position:absolute;left:50%;top:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:7px solid var(--mc,#0f766e)}
-.busmk.old .c{opacity:.55}
+/* bondi visto desde arriba: el cuerpo + la flecha del frente rotan con el rumbo; el número de línea queda derecho */
+.busmk{width:46px;height:46px;position:relative}
+.busmk .rot{position:absolute;inset:0;transform-origin:50% 50%}
+.busmk svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.busmk .lb{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:20px;height:16px;padding:0 3px;border-radius:5px;background:var(--mc,#0f766e);color:#fff;border:1.5px solid #fff;font:800 10.5px/13px system-ui,-apple-system,sans-serif;text-align:center;white-space:nowrap;letter-spacing:-.02em}
+.busmk.old .rot,.busmk.old .lb{opacity:.55}
+.stopmk{position:relative;width:100%;height:100%}
+.stopmk .sd{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#fff;border:2.5px solid var(--sc,#0f766e)}
+.stopmk .chev{position:absolute;inset:0;transform-origin:50% 50%}
+.stopmk .chev:before{content:"";position:absolute;left:50%;top:-2px;margin-left:-4.5px;border:4.5px solid transparent;border-bottom:6px solid var(--sc,#0f766e);border-top:0}
+.stopmk.big .sd{width:16px;height:16px;margin:-8px 0 0 -8px;border-width:4px}
+.stopmk.big .chev:before{top:-4px;margin-left:-6px;border-width:0 6px 8px}
 .memk{width:18px;height:18px;border-radius:9px;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25)}
 .leaflet-control-attribution{font-size:10px!important}
 .darktiles{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.6)}
-.leaflet-bottom{bottom:calc(42vh)}
+.leaflet-bottom{bottom:var(--sheetH,42vh)}
 .hidden{display:none!important}
 #toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--st) + 66px);z-index:900;background:#111827;color:#fff;padding:9px 14px;border-radius:12px;font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
 #toast.show{opacity:.95}
@@ -146,9 +158,19 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
 
 /* ---- v2 ---- */
 .busmk{transition:opacity .3s}
-.busmk.est .c{opacity:.62;border-style:dashed}
-.busmk.est .a{opacity:.5}
-.busmk.stop .a{display:none}
+.busmk.est .rot{opacity:.62}
+.busmk.est .lb{border-style:dashed}
+.busmk.stop .arw{opacity:.4}
+.chip.ln{gap:5px}
+.chip.ln i{font-style:normal;display:inline-block;min-width:22px;padding:0 4px;border-radius:5px;background:var(--lc,#475569);color:#fff;font-weight:800;text-align:center}
+.chip.ln.on{background:var(--lc,#475569);border-color:var(--lc,#475569);color:#fff}
+.chip.ln.on i{background:rgba(255,255,255,.22)}
+.lv .harw{display:inline-block;font-weight:800}
+.dirnote{font-size:12.5px;margin:2px 4px 8px;color:var(--fg)}
+.dirnote .muted{font-size:12px}
+#hostNote{position:fixed;left:10px;right:10px;top:calc(var(--st) + 62px);z-index:760;background:#1a2332;color:#cde;font:12.5px/1.35 system-ui,sans-serif;padding:8px 8px 8px 12px;border-radius:12px;box-shadow:0 4px 16px #0006;display:flex;gap:8px;align-items:flex-start}
+#hostNote[hidden]{display:none}
+#hostNote .x{flex:none;color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:14px;padding:3px 10px;font-size:12.5px;white-space:nowrap}
 .stalebar{padding:8px 12px;border-radius:12px;background:rgba(217,119,6,.12);border:1px solid var(--warn);font-size:13px;margin:6px 0}
 .hint{font-size:12px;color:var(--warn);margin:4px 2px 0;min-height:1em}
 .ver{font-size:11px;font-weight:700;background:var(--acc);color:#fff;border-radius:6px;padding:1px 5px;vertical-align:2px;margin-left:4px}
@@ -183,13 +205,14 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
 </div>
 
 <div id="sheet">
-  <div id="grab" role="button" tabindex="0" aria-label="Agrandar o achicar el panel"><i></i></div>
+  <div id="grab" role="button" tabindex="0" aria-label="Agrandar el panel (también podés deslizarlo)"><i></i>
+    <button id="sheetBtn" type="button" aria-label="Bajar el panel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span>Bajar</span></button></div>
   <div id="head"></div>
   <div id="body"></div>
 </div>
 <div id="trainBar" role="status" aria-live="polite"><span class="tt"></span><button data-act="trainView">Ver</button><button data-act="trainEnd">Terminar</button><button data-act="trainDiscard" aria-label="Cancelar y descartar la sesión">Cancelar</button></div>
-<div id="hostNote" style="position:fixed;left:8px;right:8px;bottom:8px;z-index:9998;background:#1a2332;color:#cde;font:12px/1.35 system-ui,sans-serif;padding:8px 10px;border-radius:10px;box-shadow:0 4px 16px #0006" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="hostNote" role="note" hidden><span class="tx"></span><button class="x" type="button" aria-label="Cerrar aviso">✕ Cerrar</button></div>
 
 <script src="vendor/leaflet.js"></script>
 <script>
@@ -198,7 +221,7 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
    Bondímetro v2 — cliente OneBusAway para el backend de Cuándo SUBO
    Cambios vs v1: ver README.md / CHANGELOG.md.
    ================================================================ */
-const APP_VER = "2.1.0";
+const APP_VER = "2.2.0";
 const NS = "bondi2.";   // prefijo de localStorage (v1 usa "bondi." en el mismo origen: no pisarlo)
 
 const DEFAULTS = {
@@ -208,6 +231,7 @@ const DEFAULTS = {
   proxy: "",                   // en GitHub Pages no hay proxy Daqui; auto usa fetch→JSONP
   refresh: 20,                  // s entre consultas en la vista de parada (configurable, sin mínimo duro)
   routeRefresh: 15,             // s entre consultas en la vista de línea (configurable)
+  liveRefresh: 20,              // s entre consultas en el mapa en vivo (1 pedido vehicles-for-agency por empresa cercana)
   interp: true,                 // mover los bondis entre consultas (extrapolación)
   useModel: true,               // usar lo aprendido con "Estoy en este bondi" (velocidad por tramo + desfase del feed)
   grid: "/bondi/"               // web con la grilla oficial de Mi Bus (sin datos en vivo)
@@ -221,6 +245,9 @@ const EXTRAP_MAX_S = 30;      // tope de extrapolación desde el último fix GPS
 const ANIM_MS = 1000;         // animación al llegar un fix nuevo
 const MAX_SPEED = 22;         // m/s (~80 km/h): tope para la extrapolación
 const REDUCE_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const LIVE_MAX_AGE = 30 * 60000;   // unidades sin reportar hace > 30 min: guardadas / fuera de servicio (no se muestran)
+const NEAR_RADIUS = 500;           // m: círculo "cerca mío" del mapa en vivo
+const TYPICAL_SPEED = 5.5;         // m/s (~20 km/h): solo para el "≈ N min" ESTIMADO del mapa en vivo
 
 const CITIES = [
  ["AMBA",-34.6037,-58.3816],["La Plata",-34.9214,-57.9544],["Bariloche",-41.1335,-71.3103],["Neuquén",-38.9516,-68.0591],
@@ -269,8 +296,9 @@ const S = {
   here: null, watchId: null, gpsWanted: false,
   agencies: [], agencyName: {}, routes: {}, routesByAgency: {}, stopsCache: {},
   routePolys: {}, polyLoading: new Set(),
-  stopFilter: null, selTrip: null, view: null,
+  stopFilter: null, sel: null, view: null,
   arrivals: [], situations: [], routeData: null, routeDir: 0, vehicles: [],
+  live: { list: [], none: false }, liveSel: new Set(ls("liveLines") || []), noVfa: {}, routeEntries: {},
   lastOk: 0, connErr: null,
   favs: Object.assign({ stops: [], routes: [] }, ls("favs") || {})
 };
@@ -292,7 +320,52 @@ function fmtDist(m) { return m < 1000 ? Math.max(0, Math.round(m / 10) * 10) + "
 function fmtAgo(ms) { const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + " s"; const m = Math.round(s / 60); return m < 60 ? m + " min" : Math.round(m / 60) + " h"; }
 function hhmm(t) { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
 function hashColor(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) | 0; return `hsl(${Math.abs(h) % 360} 62% 38%)`; }
-function routeColor(r) { const c = r && r.color && /^[0-9a-f]{6}$/i.test(r.color) && r.color.toLowerCase() !== "ffffff" ? "#" + r.color : null; return c || hashColor(r ? (r.shortName || r.id) : "?"); }
+function routeColor(r) { const c = r && r.color && /^[0-9a-f]{6}$/i.test(r.color) && r.color.toLowerCase() !== "ffffff" ? "#" + r.color : null; return c || hashColor(r ? lineBase(r) : "?"); }
+/* Líneas: en Cuándo SUBO cada línea viene partida en varios routeId: uno POR SENTIDO (21 = 366_2458 ida +
+   366_2459 vuelta) y uno por RAMAL (50A, 50B, 50C, cada uno con sus dos sentidos). Para el usuario "el 50"
+   es todo eso junto: se agrupa por empresa + número base (shortName sin la letra final del ramal). */
+function lineBase(r) {
+  const s = String((r && (r.shortName || r.longName)) || "").toUpperCase().replace(/\s+/g, "");
+  const m = s.match(/^(.*\d)[A-Z]$/);
+  return (m ? m[1] : s) || String((r && r.id) || "?").split("_").pop();
+}
+function agencyOf(r) { return (r && r.agencyId) || String((r && r.id) || "").split("_")[0]; }
+function lineKey(r) { return agencyOf(r) + ":" + lineBase(r); }
+const byLabel = (a, b) => String(a).localeCompare(String(b), "es", { numeric: true });
+/* Sentido de una parada: OBA trae `direction` como rumbo de brújula (N, NE, E…) = hacia dónde va el bondi
+   que para ahí (verificado contra el recorrido real del 21: coincide ±30° en 54 de 60 paradas).
+   Si no viene, se infiere del recorrido (polilínea) cuando la parada está sobre él. Si no hay nada, no se inventa. */
+const COMPASS = { N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5, SE: 135, SSE: 157.5, S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5 };
+const DIR8 = ["norte", "noreste", "este", "sureste", "sur", "suroeste", "oeste", "noroeste"];
+const ARR8 = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"];
+const oct = deg => Math.round((((deg % 360) + 360) % 360) / 45) % 8;
+const compassName = deg => DIR8[oct(deg)];
+const arrowOf = deg => ARR8[oct(deg)];
+const obaToCompass = o => (((90 - o) % 360) + 360) % 360;      // OBA: 0 = Este, antihorario → brújula
+function bearingTo(a, b) { const A = toXY(a, a[0]), B = toXY(b, a[0]); return (Math.atan2(B[0] - A[0], B[1] - A[1]) * 180 / Math.PI + 360) % 360; }
+function stopDir(s) {
+  if (!s) return null;
+  const k = String(s.direction || "").toUpperCase().trim();
+  if (k in COMPASS) return { deg: COMPASS[k], src: "sube" };
+  // 1) el recorrido de un sentido que incluye esta parada; 2) recorridos a < 40 m, solo si coinciden entre sí
+  //    (una calle con ida y vuelta por el mismo lado sería ambigua: entonces no se dice nada).
+  const at = poly => obaToCompass(pointAt(poly, project(poly, [s.lat, s.lon]).along).hd), cands = [];
+  for (const rid of s.routeIds || []) for (const poly of S.routePolys[rid] || []) {
+    if (poly.stops && poly.stops.some(x => x.id === s.id)) return { deg: at(poly), src: "recorrido" };
+    if (project(poly, [s.lat, s.lon]).off < 40) cands.push(at(poly));
+  }
+  const near = (a, b) => Math.abs(((a - b + 540) % 360) - 180) < 45;
+  if (cands.length && cands.every(c => near(c, cands[0]))) return { deg: cands[0], src: "recorrido" };
+  return null;
+}
+function stopDirText(s, long) {
+  const d = stopDir(s);
+  if (!d) return long ? `<span class="muted">Sin dato de sentido para esta parada (el servidor no lo informa).</span>` : "";
+  const t = `sentido ${arrowOf(d.deg)} ${compassName(d.deg)}`;
+  if (!long) return t;
+  // En Argentina se circula por la derecha: la parada suele estar a la derecha del sentido de marcha.
+  return `🧭 <b>${t}</b> (hacia donde va el bondi)${d.src === "recorrido" ? " · inferido del recorrido" : ""}<br><span class="muted">Vereda probable: lado ${compassName(d.deg + 90)} de la calle (se circula por la derecha; no lo informa el servidor).</span>`;
+}
 function routeText(r) { return r && r.textColor && /^[0-9a-f]{6}$/i.test(r.textColor) && r.color ? "#" + r.textColor : "#fff"; }
 function routeLabel(r) { return r ? (r.shortName || r.longName || String(r.id).split("_").pop()) : "?"; }
 function routeOf(id, short) { return S.routes[id] || { id, shortName: short }; }
@@ -472,6 +545,7 @@ function showPollError() {
   const v = S.view; if (!v) return;
   if (v.type === "stop") { if (v.loaded) renderArrivals(); else body(errBox()); }
   if (v.type === "route" && S.routeData) { renderRouteList(); drawVehicles(); }
+  if (v.type === "home") { renderLiveList(); drawLive(); }
   updateStaleMarkers();
 }
 function errBox() {
@@ -506,13 +580,40 @@ const stopLayer = L.layerGroup().addTo(map);
 const routeLayer = L.layerGroup().addTo(map);
 const busLayer = L.layerGroup().addTo(map);
 let meMarker = null, selStopMarker = null;
-function sheetPad() { const h = $("#sheet").getBoundingClientRect().height; return { paddingTopLeft: [30, 80], paddingBottomRight: [30, h + 20] }; }
-// OBA informa la orientación en grados con 0 = Este, sentido antihorario: rotación CSS = 90 − orientación.
+/* Área visible del mapa = entre la barra de arriba (y la de entrenamiento) y el BORDE SUPERIOR DE LA HOJA.
+   Se usa el alto de destino de la hoja (no el animado) para que centrar/encuadrar no quede debajo del panel. */
+function topInset() {
+  let y = $("#top").getBoundingClientRect().bottom;
+  for (const id of ["#trainBar", "#hostNote"]) { const el = $(id); if (el && el.offsetParent !== null && !el.hidden) y = Math.max(y, el.getBoundingClientRect().bottom); }
+  return Math.round(y);
+}
+function sheetPad() { return { paddingTopLeft: [30, topInset() + 14], paddingBottomRight: [30, sheetPx() + 20] }; }
+// Centra `ll` en el medio del área visible (no en el medio de la pantalla, que queda tapado por la hoja).
+function centerVisible(ll, z = map.getZoom()) {
+  const off = (sheetPx() - topInset()) / 2;
+  const c = map.unproject(map.project(L.latLng(ll), z).add([0, off]), z);
+  map.setView(c, z, { animate: !REDUCE_MOTION });
+}
+function visibleCenter() {   // punto del mapa en el medio del área visible (referencia "cerca de acá" sin GPS)
+  const sz = map.getSize(), y = (topInset() + sz.y - sheetPx()) / 2;
+  const ll = map.containerPointToLatLng([sz.x / 2, Math.max(0, y)]); return [ll.lat, ll.lng];
+}
+/* Bondi con forma de bondi (vista de arriba): cuerpo + flecha al frente, rotados con el rumbo.
+   OBA informa la orientación en grados con 0 = Este, sentido antihorario: rotación CSS = 90 − orientación.
+   El número de línea (con el ramal: 50A/50B) queda siempre derecho para leerlo de un vistazo. */
 function busIcon(r, bearing, old, label) {
-  const col = routeColor(r);
-  const rot = Number.isFinite(bearing) ? `<div class="a" style="transform:rotate(${90 - bearing}deg)"></div>` : "";
-  return L.divIcon({ className: "", iconSize: [30, 30], iconAnchor: [15, 15],
-    html: `<div class="busmk${old ? " old" : ""}" style="--mc:${col}">${rot}<div class="c">${esc((label || routeLabel(r)).slice(0, 4))}</div></div>` });
+  const col = routeColor(r), has = Number.isFinite(bearing);
+  const shape = has
+    ? `<path class="arw" d="M23 0.8 L30.5 9 L15.5 9 Z" fill="${col}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><rect x="14.5" y="9.5" width="17" height="31" rx="4.5" fill="${col}" stroke="#fff" stroke-width="2"/><rect x="17" y="11.5" width="12" height="4.2" rx="1.4" fill="#fff" opacity=".92"/><rect x="18" y="36" width="10" height="2.3" rx="1" fill="#fff" opacity=".55"/>`
+    : `<circle cx="23" cy="23" r="13" fill="${col}" stroke="#fff" stroke-width="2"/>`;
+  return L.divIcon({ className: "", iconSize: [46, 46], iconAnchor: [23, 23],
+    html: `<div class="busmk${old ? " old" : ""}${has ? "" : " nodir"}" style="--mc:${col}"><div class="rot"${has ? ` style="transform:rotate(${Math.round(90 - bearing)}deg)"` : ""}><svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">${shape}</svg></div><div class="lb">${esc(String(label || routeLabel(r)).slice(0, 6))}</div></div>` });
+}
+// Parada: punto chico + chevrón que apunta hacia donde va el bondi (si se sabe).
+function stopIcon(s, col = "#0f766e", big = false) {
+  const d = stopDir(s), sz = big ? 30 : 22;
+  return L.divIcon({ className: "", iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2],
+    html: `<div class="stopmk${big ? " big" : ""}" style="--sc:${col}">${d ? `<div class="chev" style="transform:rotate(${Math.round(d.deg)}deg)"></div>` : ""}<div class="sd"></div></div>` });
 }
 
 /* ----------------- geometría para la interpolación --------------- */
@@ -545,9 +646,18 @@ function pointAt(poly, along) {
 }
 
 /* ----------- seguimiento de unidades (marcadores reusados) -------- */
-// Track: tripId → { fixes, vel, marker, shown, anim, meta, iconKey, last }
-// El mismo motor sirve para la vista de parada y para la vista de línea (todas las unidades).
+// Track: clave → { fixes, vel, marker, shown, anim, meta, iconKey, last }
+// Clave = vehicleId (el interno) y, si el feed no lo trae, tripId. Ojo: en Cuándo SUBO VARIAS unidades
+// pueden compartir el mismo tripId (visto el 30/10: 3 internos en 366_375349-1); por eso no se usa tripId.
+// El mismo motor sirve para el mapa en vivo, la vista de parada y la vista de línea.
 const Track = new Map();
+function trackFor(id) { if (Track.has(id)) return Track.get(id); for (const tr of Track.values()) if (tr.meta.tripId === id || tr.meta.vehicleId === id) return tr; return null; }
+// ¿Es la unidad que se está entrenando? Por interno si se conoce; si no, por viaje.
+function isTrainTarget(m) {
+  const s = TR.session; if (!s || !m) return false;
+  if (s.vehicleId && m.vehicleId) return s.vehicleId === m.vehicleId;
+  return !!m.tripId && m.tripId === s.tripId;
+}
 function clearTracks() { for (const tr of Track.values()) busLayer.removeLayer(tr.marker); Track.clear(); }
 function addFix(tr, lat, lon, t) {
   const last = tr.fixes[tr.fixes.length - 1];
@@ -590,7 +700,7 @@ function estimate(tr, T) {
   const v = tr.vel;
   if (!S.settings.interp || !v || !(v.speed > 0) || isStale()) return base;
   // Modelo aprendido (solo si no es el bondi que se está entrenando ahora: ese se mide "en crudo").
-  const useM = S.settings.useModel !== false && !(TR.session && TR.session.tripId === tr.meta.id);
+  const useM = S.settings.useModel !== false && !isTrainTarget(tr.meta);
   const lag = useM ? lagMs() : 0;                 // el feed fecha el fix ~lag ms más tarde de lo real
   const dt = Math.min(EXTRAP_MAX_S, Math.max(0, (T - f.t + lag) / 1000));
   if (dt < 1) return base;
@@ -602,7 +712,7 @@ function estimate(tr, T) {
   const o = toXY([f.lat, f.lon], f.lat);
   return { p: fromXY(o[0] + v.ux * d, o[1] + v.uy * d, f.lat), est: true, moved: d, hd: v.hd, src };
 }
-// items: [{ id, routeId, lat, lon, t, bearing, old, faded, z, tip, label, maxAhead }]
+// items: [{ id (vehicleId||tripId), tripId, vehicleId, routeId, lat, lon, t, bearing, old, faded, z, tip, label, maxAhead }]
 function syncBuses(items) {
   const seen = new Set();
   for (const it of items) {
@@ -611,15 +721,15 @@ function syncBuses(items) {
     if (!tr) { tr = { fixes: [], vel: null, marker: null, shown: null, anim: null, meta: it, iconKey: "" }; Track.set(it.id, tr); isNew = true; }
     tr.meta = it;
     const fresh = addFix(tr, it.lat, it.lon, it.t);
-    if (fresh && TR.session && it.id === TR.session.tripId) trainOnObaFix(it);
+    if (fresh && isTrainTarget(it)) trainOnObaFix(it);
     const e = estimate(tr, now());
     const r = routeOf(it.routeId);
     const bearing = Number.isFinite(it.bearing) ? it.bearing : (e.hd != null ? e.hd : (tr.vel && tr.vel.hd != null ? tr.vel.hd : NaN));
-    const key = [routeColor(r), Math.round(bearing / 5), !!it.old, it.label].join("|");
+    const key = [routeColor(r), Math.round(bearing / 5), !!it.old, it.label || routeLabel(r)].join("|");
     if (isNew) {
       tr.marker = L.marker(e.p, { icon: busIcon(r, bearing, it.old, it.label), zIndexOffset: it.z || 500, opacity: it.faded ? .5 : 1, keyboard: false });
       tr.marker.on("click", () => ACTIONS.bus(it.id));
-      tr.marker.bindTooltip("", { direction: "top", offset: [0, -14] });
+      tr.marker.bindTooltip("", { direction: "top", offset: [0, -20] });
       busLayer.addLayer(tr.marker); tr.shown = e.p; tr.iconKey = key;
     } else {
       if (key !== tr.iconKey) { tr.marker.setIcon(busIcon(r, bearing, it.old, it.label)); tr.iconKey = key; tr.estShown = null; }
@@ -735,13 +845,18 @@ function modelAdvance(poly, along, fallback, dt) {
   return { d: pos - along, used };
 }
 const TR = { session: null, watch: null, prev: null, poly: null, pass: null, hist: [], jumps: 0 };
-function trainStart(tripId, routeId) {
+// vehicleId: el interno elegido (si se conoce). Si no, se deduce cuando el viaje tiene una sola unidad.
+function trainStart(tripId, routeId, vehicleId) {
   if (!tripId || !routeId) return;
   if (!("geolocation" in navigator)) return toast("Este navegador no ofrece ubicación: no puedo entrenar");
   if (TR.session) trainEnd(false, true);
-  const r = routeOf(routeId), tr = Track.get(tripId), veh = (S.vehicles || []).find(v => v.tripId === tripId),
+  const r = routeOf(routeId), veh = (S.vehicles || []).find(v => v.tripId === tripId && (!vehicleId || v.vehicleId === vehicleId)) || (S.live.list || []).find(v => v.tripId === tripId),
     arr = (S.arrivals || []).find(a => a.tripId === tripId);
-  TR.session = { sid: Date.now().toString(36), tripId, routeId, label: routeLabel(r),
+  if (!vehicleId) {
+    const ts = [...Track.values()].filter(t => t.meta.tripId === tripId && t.meta.vehicleId);
+    vehicleId = ts.length === 1 ? ts[0].meta.vehicleId : (arr && arr.vehicleId) || "";
+  }
+  TR.session = { sid: Date.now().toString(36), tripId, vehicleId: vehicleId || "", routeId, label: routeLabel(r),
     headsign: (veh && veh.trip.tripHeadsign) || (arr && arr.tripHeadsign) || "", t0: Date.now(),
     st: { fixes: 0, ok: 0, rejAcc: 0, rejJump: 0, rejOff: 0, stopsDropped: 0, passes: 0, pairs: 0, lastAcc: null, lastFix: 0 } };
   ls("trainSession", TR.session);
@@ -750,7 +865,7 @@ function trainStart(tripId, routeId) {
   renderTrainBar();
   toast("🎓 Entrenando con este bondi. Dejá la pantalla prendida. Los datos quedan solo en este celu.", 4500);
   const h = "#/route/" + encodeURIComponent(routeId);
-  if (location.hash !== h) go(h); else { S.selTrip = tripId; renderRouteList(); drawVehicles(); }
+  if (location.hash !== h) go(h); else { S.sel = vehicleId || tripId; renderRouteList(); drawVehicles(); }
 }
 function trainWatch() {
   if (TR.watch != null) navigator.geolocation.clearWatch(TR.watch);
@@ -896,7 +1011,8 @@ map.on("moveend", () => {
 });
 async function loadMapStops() {
   if (S.view && S.view.type === "route") return;
-  if (map.getZoom() < 15) { stopLayer.clearLayers(); return; }
+  // Las paradas van en segundo plano: solo con zoom de cuadra (≥ 16), chicas y con su sentido.
+  if (map.getZoom() < 16) { stopLayer.clearLayers(); return; }
   const c = map.getCenter(), b = map.getBounds();
   const radius = Math.min(1500, Math.round(dist([c.lat, c.lng], [b.getNorth(), b.getEast()])));
   const my = ++stopsReq;
@@ -911,9 +1027,10 @@ function drawStops(list) {
   stopLayer.clearLayers();
   for (const s of list) {
     S.stopsCache[s.id] = s;
-    const m = L.circleMarker([s.lat, s.lon], { radius: 6, weight: 2, color: "#fff", fillColor: "#0f766e", fillOpacity: 1 });
+    const m = L.marker([s.lat, s.lon], { icon: stopIcon(s, "#64748b"), zIndexOffset: -200, keyboard: false, title: s.name });
     m.on("click", () => go("#/stop/" + encodeURIComponent(s.id)));
-    m.bindTooltip(esc(s.name), { direction: "top", offset: [0, -6] });
+    const dt = stopDirText(s);
+    m.bindTooltip(esc(s.name) + (dt ? "<br>" + dt : ""), { direction: "top", offset: [0, -8] });
     stopLayer.addLayer(m);
   }
 }
@@ -928,38 +1045,88 @@ function startGps(center = false) {
   S.watchId = navigator.geolocation.watchPosition(p => {
     showMe([p.coords.latitude, p.coords.longitude]);
     $("#btnLoc").classList.add("on");
-    if (first && center) { map.setView(S.here, Math.max(map.getZoom(), 16)); if (!S.view || S.view.type === "home") renderHome(); }
+    if (first && center) { centerVisible(S.here, (center === "live" || !S.view || S.view.type === "home") ? 15 : Math.max(map.getZoom(), 16)); if (!S.view || S.view.type === "home") renderHome(); }
     first = false;
   }, err => {
     $("#btnLoc").classList.remove("on");
     if (err.code === 1) { S.gpsWanted = false; ls("gps", false); }
-    if (center) toast(err.code === 1 ? "Sin permiso de ubicación: mové el mapa o buscá la parada" : "No pude obtener la ubicación");
+    if (center === true) toast(err.code === 1 ? "Sin permiso de ubicación: mové el mapa o buscá la parada" : "No pude obtener la ubicación");
   }, { enableHighAccuracy: false, maximumAge: 15000, timeout: 20000 });
 }
+let meCircle = null;
 function showMe(pt) {
   S.here = pt;
-  if (!meMarker) meMarker = L.marker(pt, { icon: L.divIcon({ className: "", html: '<div class="memk"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 1000, keyboard: false }).addTo(map);
+  if (!meMarker) meMarker = L.marker(pt, { icon: L.divIcon({ className: "", html: '<div class="memk"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 1000, keyboard: false, title: "Vos" }).addTo(map);
   else meMarker.setLatLng(pt);
+  // Radio "cerca mío" (500 m) para ver de un vistazo qué bondis andan cerca.
+  if (!meCircle) meCircle = L.circle(pt, { radius: NEAR_RADIUS, color: "#2563eb", weight: 1.5, dashArray: "5 6", fillColor: "#2563eb", fillOpacity: .05, interactive: false }).addTo(map);
+  else meCircle.setLatLng(pt);
 }
 function pauseGps() { if (S.watchId != null) { navigator.geolocation.clearWatch(S.watchId); S.watchId = null; } }
 function resumeGps() { if (S.gpsWanted && S.watchId == null) startGps(false); }
-$("#btnLoc").onclick = () => { if (S.here) map.setView(S.here, Math.max(map.getZoom(), 16)); startGps(true); };
+// "Mi ubicación": baja la hoja si estaba expandida y centra en el ÁREA VISIBLE (arriba de la hoja).
+$("#btnLoc").onclick = () => {
+  if (sheetState === "max") setSheet("mid");
+  const home = !S.view || S.view.type === "home";   // en el mapa en vivo, zoom 15: entra el radio de 500 m y los bondis de alrededor
+  if (S.here) centerVisible(S.here, home ? 15 : Math.max(map.getZoom(), 16));
+  startGps(!S.here);
+};
 
 /* ----------------------- hoja inferior --------------------------- */
-const sheet = $("#sheet");
-function setSheet(state) { sheet.className = state || ""; setTimeout(() => map.invalidateSize(), 260); }
-function cycleSheet() { setSheet(sheet.classList.contains("max") ? "min" : sheet.classList.contains("min") ? "" : "max"); }
-$("#grab").onclick = cycleSheet;
-(function dragSheet() {
-  let y0 = null;
-  $("#grab").addEventListener("touchstart", e => { y0 = e.touches[0].clientY; }, { passive: true });
-  $("#grab").addEventListener("touchend", e => {
-    if (y0 == null) return; const dy = e.changedTouches[0].clientY - y0; y0 = null;
-    if (Math.abs(dy) < 25) return;
-    const cur = sheet.classList.contains("max") ? 2 : sheet.classList.contains("min") ? 0 : 1;
-    setSheet(["min", "", "max"][Math.max(0, Math.min(2, cur + (dy < 0 ? 1 : -1)))]);
-  });
-})();
+/* Tres estados: "min" (colapsada: solo el título), "mid" (media, ~44%), "max" (expandida, tope ~68% del alto
+   visible: el mapa y el botón para bajarla siempre quedan a la vista; el contenido scrollea por dentro).
+   Se baja con: el botón "Bajar" (siempre visible), tocar el mapa, deslizar hacia abajo la manija o el título,
+   o Escape. Se sube tocando la manija o deslizando hacia arriba. */
+const sheet = $("#sheet"), SHEET_STATES = ["min", "mid", "max"];
+let sheetState = "mid";
+function viewH() { return Math.round((window.visualViewport && visualViewport.height) || innerHeight); }
+function sheetTarget(st = sheetState) {
+  const H = viewH();
+  const px = st === "min" ? 112 : st === "max" ? Math.round(H * 0.68) : Math.round(H * 0.44);
+  return Math.max(96, Math.min(px, H - 150));
+}
+function sheetPx() { return sheetTarget() + (parseFloat(getComputedStyle(sheet).paddingBottom) || 0); }
+function setSheet(state) {
+  sheetState = SHEET_STATES.includes(state) ? state : "mid";
+  sheet.className = sheetState;
+  sheet.style.height = `calc(${sheetTarget()}px + var(--sb))`;
+  document.documentElement.style.setProperty("--sheetH", sheetPx() + "px");
+  const b = $("#sheetBtn"), up = sheetState === "min";
+  b.setAttribute("aria-label", up ? "Subir el panel" : "Bajar el panel"); b.querySelector("span").textContent = up ? "Subir" : "Bajar";
+  $("#grab").setAttribute("aria-expanded", String(sheetState === "max"));
+}
+function stepSheet(dir) { setSheet(SHEET_STATES[Math.max(0, Math.min(2, SHEET_STATES.indexOf(sheetState) + dir))]); }
+$("#grab").addEventListener("click", e => { if (e.target.closest("#sheetBtn")) return; if (sheetDrag.moved) return; setSheet(sheetState === "mid" ? "max" : "mid"); });
+$("#sheetBtn").addEventListener("click", e => { e.stopPropagation(); setSheet(sheetState === "min" ? "mid" : "min"); });
+const sheetDrag = { y0: null, y: 0, moved: false };
+// El gesto empieza en el handle o la cabecera y termina donde sea (el dedo/mouse sale del handle al arrastrar).
+// Si el navegador cancela el puntero a mitad de camino (arrastre nativo, scroll), se usa la última posición vista.
+for (const el of [$("#grab"), $("#head")]) {
+  el.addEventListener("pointerdown", e => { if (e.button > 0) return; sheetDrag.y0 = sheetDrag.y = e.clientY; sheetDrag.moved = false; });
+  el.addEventListener("dragstart", e => e.preventDefault());
+}
+addEventListener("pointermove", e => { if (sheetDrag.y0 != null) sheetDrag.y = e.clientY; });
+function endSheetDrag(y) {
+  if (sheetDrag.y0 == null) return; const dy = y - sheetDrag.y0; sheetDrag.y0 = null;
+  if (Math.abs(dy) < 30) return;
+  sheetDrag.moved = true; setTimeout(() => { sheetDrag.moved = false; }, 350);
+  stepSheet(dy > 0 ? (dy > 160 ? -2 : -1) : (dy < -160 ? 2 : 1));
+}
+addEventListener("pointerup", e => endSheetDrag(e.clientY));
+addEventListener("pointercancel", () => endSheetDrag(sheetDrag.y));
+map.on("click", () => { if (sheetState !== "min") setSheet("min"); });   // tocar el mapa = bajar el panel
+document.addEventListener("keydown", e => { if (e.key === "Escape" && document.activeElement !== $("#q") && sheetState !== "min") stepSheet(-1); });
+addEventListener("resize", () => setSheet(sheetState));
+setSheet("mid");
+/* Aviso de hosting (GitHub Pages sin proxy): arriba, con botón "✕ Cerrar" visible, y se recuerda cerrado. */
+function showHostNote(force) {
+  const n = $("#hostNote");
+  const pages = /github\.io$/i.test(location.hostname) && !S.settings.proxy;
+  if (!n || (!force && (!pages || ls("hostNoteClosed")))) return;
+  n.querySelector(".tx").innerHTML = "Hosteado en GitHub Pages (sin proxy de Daqui). Si no cargan los bondis, en Ajustes probá el modo <b>JSONP</b>.";
+  n.hidden = false;
+}
+$("#hostNote").addEventListener("click", () => { $("#hostNote").hidden = true; ls("hostNoteClosed", true); });
 function head(html) { $("#head").innerHTML = html; }
 function body(html) { $("#body").innerHTML = html; }
 
@@ -981,18 +1148,32 @@ const ACTIONS = {
   },
   filter: id => { S.stopFilter = id || null; renderArrivals(); },
   pick: trip => {
-    S.selTrip = S.selTrip === trip ? null : trip;
+    S.sel = S.sel === trip ? null : trip;
     renderArrivals();
-    const tr = Track.get(trip), s = S.view && S.stopsCache[S.view.id];
-    if (S.selTrip && tr && s) fitVisible([tr.shown, [s.lat, s.lon]], 16);
-    else if (S.selTrip && !tr) toast("Este viaje no tiene posición GPS (solo horario)");
+    const tr = trackFor(trip), s = S.view && S.stopsCache[S.view.id];
+    if (S.sel && tr && s) fitVisible([tr.shown, [s.lat, s.lon]], 16);
+    else if (S.sel && !tr) toast("Este viaje no tiene posición GPS (solo horario)");
   },
-  bus: trip => {
-    if (S.view && S.view.type === "stop") return ACTIONS.pick(trip);
-    S.selTrip = trip; if (S.view && S.view.type === "route") { renderRouteList(); drawVehicles(); }
-    const tr = Track.get(trip); if (tr) { map.setView(tr.shown, Math.max(map.getZoom(), 16), { animate: !REDUCE_MOTION }); tr.marker.openTooltip(); }
+  bus: key => {
+    const tr = Track.get(key);
+    if (S.view && S.view.type === "stop") return ACTIONS.pick(tr ? tr.meta.tripId : key);
+    if (S.view && S.view.type === "home") return ACTIONS.livePick(key);
+    S.sel = key; if (S.view && S.view.type === "route") { renderRouteList(); drawVehicles(); }
+    if (tr) { centerVisible(tr.shown, Math.max(map.getZoom(), 16)); tr.marker.openTooltip(); }
   },
-  trainStart: (trip, el) => trainStart(trip, el && el.dataset.route),
+  livePick: key => {
+    S.sel = S.sel === key ? null : key;
+    renderLiveList(); drawLive();
+    const tr = Track.get(key);
+    if (S.sel && tr) { centerVisible(tr.shown, Math.max(map.getZoom(), 15)); tr.marker.openTooltip(); }
+  },
+  liveLine: k => {
+    if (!k) S.liveSel.clear(); else if (S.liveSel.has(k)) S.liveSel.delete(k); else S.liveSel.add(k);
+    ls("liveLines", [...S.liveSel]); renderLiveList(); drawLive();
+  },
+  liveFit: () => { const pts = liveFiltered().map(v => (Track.get(v.key) || {}).shown).filter(Boolean); if (S.here) pts.push(S.here); if (pts.length) fitVisible(pts, 16); },
+  sheet: st => setSheet(st),
+  trainStart: (trip, el) => trainStart(trip, el && el.dataset.route, el && el.dataset.veh),
   trainEnd: () => trainEnd(false),
   trainDiscard: () => trainEnd(true),
   trainView: () => { if (TR.session) go("#/route/" + encodeURIComponent(TR.session.routeId)); },
@@ -1001,12 +1182,12 @@ const ACTIONS = {
     TM.model = { v: 1, segs: {}, lag: [], sessions: 0 }; TM.pairs = []; trainSave(); ls("trainPairs", []); renderTrainStats(); toast("Datos de entrenamiento borrados");
   },
   trainExport: () => trainExport(),
-  dir: i => { S.routeDir = +i; ls("dir." + S.view.id, S.routeDir); drawRoute(true); renderRouteList(); drawVehicles(); },
+  dir: i => { S.routeDir = +i; if (S.routeData) ls("dir." + S.routeData.key, S.routeDir); drawRoute(true); renderRouteList(); drawVehicles(); },
   scope: v => { S.routeAll = v === "all"; ls("routeAll", S.routeAll); drawRoute(false); renderRouteList(); drawVehicles(); },
   fitBuses: () => { const pts = [...Track.values()].map(t => t.shown); if (pts.length) fitVisible(pts, 16); else toast("No hay unidades con GPS ahora"); },
   cluster: i => {
     const c = S.clusters[+i]; if (!c) return; const known = CITIES.find(x => x[0] === c.name);
-    setSheet("");
+    setSheet("mid");
     if (known) map.setView([known[1], known[2]], 14); else map.fitBounds(L.latLngBounds(c.pts).pad(0.3));
     setTimeout(() => go("#/"), 50);
   },
@@ -1031,7 +1212,7 @@ function go(h) { if (location.hash === h) route(); else location.hash = h; }
 window.addEventListener("hashchange", route);
 function route() {
   const h = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
-  stopPoll(); clearTracks(); routeLayer.clearLayers(); S.selTrip = null; S.connErr = null; S.lastOk = 0;
+  stopPoll(); clearTracks(); routeLayer.clearLayers(); S.sel = null; S.connErr = null; S.lastOk = 0;
   if (selStopMarker) { map.removeLayer(selStopMarker); selStopMarker = null; }
   if (h.startsWith("stop/")) return openStop(h.slice(5));
   if (h.startsWith("route/")) return openRoute(h.slice(6));
@@ -1050,7 +1231,7 @@ function fmtEta(t) {
   const m = Math.round(s / 60);
   return m > 99 ? [hhmm(t), "", "llega a las " + hhmm(t)] : [String(m), "min", "llega en " + m + " minutos"];
 }
-let wasStale = null;
+let wasStale = null, liveListAt = 0;
 function tick() {
   for (const el of document.querySelectorAll("[data-t]")) {
     const [big, small, aria] = fmtEta(+el.dataset.t);
@@ -1061,7 +1242,7 @@ function tick() {
     const age = now() - +el.dataset.loc; el.textContent = "GPS hace " + fmtAgo(age); el.classList.toggle("stale", age > 180000);
   }
   for (const el of document.querySelectorAll("[data-dist]")) {
-    const tr = Track.get(el.dataset.trip), mv = tr && tr.last ? tr.last.moved : 0;
+    const tr = trackFor(el.dataset.trip), mv = tr && tr.last ? tr.last.moved : 0;
     el.textContent = (mv > 0 ? "≈ " : "") + fmtDist(+el.dataset.dist - mv);
   }
   const u = $("#upd");
@@ -1074,7 +1255,8 @@ function tick() {
   const st = P.fn ? isStale() : false;
   const changed = wasStale !== null && st !== wasStale;
   wasStale = st;                     // antes de re-renderizar: renderArrivals() llama a tick()
-  if (changed && S.view && S.view.loaded) showPollError();
+  if (changed && S.view && (S.view.loaded || S.view.type === "home")) showPollError();
+  if (S.view && S.view.type === "home" && Date.now() - liveListAt > 5000) renderLiveList();
   if (REDUCE_MOTION && Track.size) updateMarkers(performance.now());
   if (TR.session) renderTrainBar();
 }
@@ -1082,45 +1264,177 @@ setInterval(tick, 1000);
 
 /* ============================ VISTAS ============================= */
 
-/* ---- inicio: favoritos + cercanas ---- */
+/* ---- inicio: MAPA EN VIVO (todos los bondis circulando) + favoritos + paradas cercanas ---- */
+// Un pedido vehicles-for-agency por empresa cercana (máx. 3) cada liveRefresh s, con el mismo polling
+// (backoff, pausa en segundo plano, freno con 401). Los bondis van arriba; las paradas, de fondo.
 async function renderHome() {
   S.view = { type: "home" };
-  if (sheet.classList.contains("max")) setSheet("");
+  if (sheetState === "max") setSheet("mid");
   const zone = cityName(map.getCenter().lat, map.getCenter().lng);
-  head(`<h2>Bondímetro<span class="ver">v2</span> <span class="sub">${zone ? "· " + esc(zone) : ""}</span></h2>`);
+  head(`<h2>Bondímetro<span class="ver">v2</span> <span class="sub">${zone ? "· " + esc(zone) : ""} · mapa en vivo</span></h2>`);
   let html = "";
   if (Object.keys(URL_OVERRIDES).length) html += `<div class="alert">🧪 Modo prueba por URL (${esc(Object.keys(URL_OVERRIDES).join(", "))}). No se guarda salvo que toques Guardar en Ajustes.</div>`;
+  html += `<div id="liveBox"></div>`;
   if (S.favs.stops.length || S.favs.routes.length) {
     html += `<div class="sec">Favoritos</div>`;
     for (const f of S.favs.routes) html += `<div class="item" ${goAttr("#/route/" + encodeURIComponent(f.id))}>${badge(S.routes[f.id] || { id: f.id, shortName: f.label, color: f.color })}<div class="mid"><div class="t">${esc(f.name || "Línea " + f.label)}</div><div class="s">Línea · todas las unidades en el mapa</div></div></div>`;
     for (const f of S.favs.stops) html += `<div class="item" ${goAttr("#/stop/" + encodeURIComponent(f.id))}><span class="badge" style="background:#0f766e">P</span><div class="mid"><div class="t">${esc(f.name)}</div><div class="s">${f.code ? "Parada " + esc(f.code) : "Parada"}</div></div></div>`;
   }
   html += `<div class="sec">Paradas cerca ${S.here ? "tuyo" : "del centro del mapa"}</div>`;
-  if (!S.here) html += `<div class="small muted" style="margin:0 4px 4px">Tocá ◎ arriba para usar tu ubicación.</div>`;
   html += `<div id="near"><div class="note"><span class="spin"></span> Buscando paradas…</div></div><div class="small" style="margin:10px 4px">${gridLink()}</div>`;
   body(html);
-  const ref = S.here || [map.getCenter().lat, map.getCenter().lng];
+  renderLiveList(); drawLive();
+  if (P.fn !== loadLive) startPoll(loadLive, S.settings.liveRefresh || DEFAULTS.liveRefresh);
+  const ref = S.here || visibleCenter();
   try {
     const r = await api("stops-for-location", { lat: r3(ref[0]), lon: r3(ref[1]), radius: 600, maxCount: 40 });
     indexRefs(r.data.references);
     const list = (r.data.list || []).map(s => ({ s, d: dist(ref, [s.lat, s.lon]) })).sort((a, b) => a.d - b.d).slice(0, 15);
-    if (!S.view || S.view.type !== "home") return;
+    if (!S.view || S.view.type !== "home" || !$("#near")) return;
     if (!list.length) { $("#near").innerHTML = `<div class="note">No hay paradas con datos en 600 m${r.data.outOfRange ? " (zona fuera de cobertura del servidor)" : ""}. Mové el mapa o <a href="#/cities">elegí una ciudad con cobertura</a>.</div>`; return; }
-    $("#near").innerHTML = list.map(({ s, d }) => `
-      <div class="item" ${goAttr("#/stop/" + encodeURIComponent(s.id))}>
+    $("#near").innerHTML = list.map(({ s, d }) => {
+      const dt = stopDirText(s);
+      return `<div class="item" ${goAttr("#/stop/" + encodeURIComponent(s.id))}>
         <div class="mid"><div class="t">${esc(s.name)}</div>
-        <div class="s">${fmtDist(d)}${s.direction ? " · hacia " + esc(s.direction) : ""}${s.code ? " · " + esc(s.code) : ""}</div>
+        <div class="s">${fmtDist(d)} · ${dt || "sin dato de sentido"}${s.code ? " · " + esc(s.code) : ""}</div>
         <div class="badges">${(s.routeIds || []).map(id => badge(S.routes[id] || { id })).join("")}</div></div>
-      </div>`).join("");
+      </div>`; }).join("");
   } catch (e) {
     if ($("#near") && S.view && S.view.type === "home") $("#near").innerHTML = `<div class="note err">${errMsg(e)}</div>`;
   }
 }
+// vehicles-for-agency → unidades en circulación. Se descartan las sin viaje asignado (guardadas) y las que
+// no reportan hace > 30 min. Posición: `location` (GPS crudo del bondi); si falta, la estimada por OBA.
+function vehiclesFromVfa(r) {
+  indexRefs(r.data.references);
+  const trips = {}; for (const t of (r.data.references && r.data.references.trips) || []) trips[t.id] = t;
+  const out = [], seen = new Set(), T = now();
+  for (const x of r.data.list || []) {
+    const st = x.tripStatus || {}, tripId = x.tripId || st.activeTripId;
+    if (!tripId) continue;
+    const trip = trips[tripId] || {}, routeId = trip.routeId;
+    if (!routeId) continue;
+    const pos = [x.location, st.lastKnownLocation, st.position].find(p => p && p.lat && p.lon);
+    if (!pos) continue;
+    const t = x.lastLocationUpdateTime || x.lastUpdateTime || locTime(st) || 0;
+    if (t && T - t > LIVE_MAX_AGE) continue;
+    const vehicleId = x.vehicleId || st.vehicleId || "", key = vehicleId || tripId;
+    if (seen.has(key)) continue; seen.add(key);
+    out.push({ key, vehicleId, tripId, routeId, trip, st, pos: { lat: pos.lat, lon: pos.lon }, t, dir: trip.directionId,
+      orient: Number.isFinite(st.orientation) ? st.orientation : NaN });
+  }
+  return out;
+}
+// trips-for-route (plan B si la empresa no publica vehicles-for-agency). Trae también viajes "solo horario"
+// (sin interno, sin GPS, predicted:false): esos NO son bondis en la calle y no se dibujan.
+function vehiclesFromTfr(r, rid) {
+  indexRefs(r.data.references);
+  const trips = {}; for (const t of (r.data.references && r.data.references.trips) || []) trips[t.id] = t;
+  const out = [];
+  for (const x of r.data.list || []) {
+    const st = x.status || {}, tripId = x.tripId || st.activeTripId, trip = trips[tripId] || {};
+    if (!tripId || (!st.predicted && !st.vehicleId && !locTime(st))) continue;
+    const pos = [st.lastKnownLocation, st.position].find(p => p && p.lat && p.lon); if (!pos) continue;
+    const t = locTime(st); if (t && now() - t > LIVE_MAX_AGE) continue;
+    out.push({ key: st.vehicleId || tripId, vehicleId: st.vehicleId || "", tripId, routeId: trip.routeId || rid, trip, st, pos: { lat: pos.lat, lon: pos.lon }, t, dir: trip.directionId,
+      orient: Number.isFinite(st.orientation) ? st.orientation : NaN });
+  }
+  return out;
+}
+const isNotFound = e => e instanceof ApiError && e.code === 404;
+async function loadLive(signal) {
+  if (!S.agencies.length) await loadAgencies();
+  const ags = nearAgencies(40, 3), out = [], seen = new Set();
+  for (const a of ags) {
+    if (S.noVfa[a.id]) continue;
+    try { for (const v of vehiclesFromVfa(await api("vehicles-for-agency/" + encodeURIComponent(a.id), {}, signal))) if (!seen.has(v.key)) { seen.add(v.key); out.push(v); } }
+    catch (e) { if (isNotFound(e)) S.noVfa[a.id] = true; else throw e; }
+  }
+  if (!S.view || S.view.type !== "home") return;
+  S.live = { list: out, none: !ags.length, noVfa: ags.length > 0 && ags.every(a => S.noVfa[a.id]), at: Date.now() };
+  S.lastOk = Date.now(); S.connErr = null;
+  renderLiveList(); drawLive();
+}
+function liveLines() {
+  const m = new Map();
+  for (const v of S.live.list) { const r = routeOf(v.routeId), k = lineKey(r); const e = m.get(k) || { key: k, base: lineBase(r), r, n: 0 }; e.n++; m.set(k, e); }
+  return [...m.values()].sort((a, b) => byLabel(a.base, b.base));
+}
+function liveFiltered() { return S.live.list.filter(v => !S.liveSel.size || S.liveSel.has(lineKey(routeOf(v.routeId)))); }
+function liveRef() { return S.here ? { p: S.here, me: true } : { p: visibleCenter(), me: false }; }
+// Rumbo en grados de brújula: el que informa el feed; si no, el del movimiento observado.
+function busCompass(v, tr) {
+  const o = Number.isFinite(v.orient) ? v.orient : tr && tr.vel && tr.vel.speed > 0 && tr.vel.hd != null ? tr.vel.hd : NaN;
+  return Number.isFinite(o) ? obaToCompass(o) : null;
+}
+function liveRow(v, ref) {
+  const r = routeOf(v.routeId), tr = Track.get(v.key), p = (tr && tr.shown) || [v.pos.lat, v.pos.lon];
+  const d = dist(ref.p, p), c = busCompass(v, tr), bits = [fmtDist(d)];
+  let rel = "";
+  if (c == null) bits.push(`<span class="muted">sin rumbo informado</span>`);
+  else {
+    bits.push(`<span class="harw" aria-hidden="true">${arrowOf(c)}</span> va al ${compassName(c)}`);
+    const diff = Math.abs(((bearingTo(p, ref.p) - c + 540) % 360) - 180);
+    if (d < 60) rel = ref.me ? "está acá" : "en el centro";
+    else if (diff < 60) {
+      const sp = tr && tr.vel && tr.vel.speed > 2 ? tr.vel.speed : TYPICAL_SPEED, min = Math.max(1, Math.round(d / sp / 60));
+      rel = `${ref.me ? "viene hacia vos" : "viene hacia acá"} · <b>≈ ${min} min</b> <span class="muted">(estimado, en línea recta)</span>`;
+    } else rel = diff > 120 ? "se aleja" : "pasa de costado";
+  }
+  if (rel) bits.push(rel);
+  if (v.t) bits.push(`<span class="muted" data-loc="${v.t}">GPS hace ${fmtAgo(now() - v.t)}</span>`);
+  return { d, html: `<div class="item lv${S.sel === v.key ? " sel" : ""}" role="button" tabindex="0" ${actAttr("livePick", v.key)}>${badge(r)}<div class="mid"><div class="t">→ ${esc(v.trip.tripHeadsign || r.longName || "")}</div><div class="s">${bits.join(" · ")}</div></div></div>` };
+}
+function renderLiveList() {
+  liveListAt = Date.now();
+  const box = $("#liveBox"); if (!box || !S.view || S.view.type !== "home") return;
+  const lines = liveLines(), list = liveFiltered(), stale = isStale(), ref = liveRef();
+  let html = errBox();
+  if (S.live.none) html += `<div class="note">No hay empresas con datos en esta zona del mapa. <a href="#/cities">Elegí una ciudad con cobertura</a>.</div>`;
+  else if (!S.live.at) html += `<div class="note"><span class="spin"></span> Buscando bondis en circulación…</div>`;
+  else if (S.live.noVfa) html += `<div class="note">Esta empresa no publica la lista de unidades en circulación. Buscá la línea o tocá una parada.<div>${gridLink()}</div></div>`;
+  else if (!S.live.list.length) html += `<div class="note">No hay bondis con GPS en circulación ahora en esta zona.<div>${gridLink()}</div></div>`;
+  if (lines.length) {
+    html += `<div class="chips" id="liveChips"><button class="chip ${S.liveSel.size ? "" : "on"}" ${actAttr("liveLine", "")} aria-pressed="${!S.liveSel.size}">Todas (${S.live.list.length})</button>` +
+      lines.map(e => `<button class="chip ln ${S.liveSel.has(e.key) ? "on" : ""}" style="--lc:${routeColor(e.r)}" ${actAttr("liveLine", e.key)} aria-pressed="${S.liveSel.has(e.key)}" aria-label="Línea ${esc(e.base)}: ${e.n} en circulación"><i>${esc(e.base)}</i>${e.n}</button>`).join("") +
+      `<button class="chip" ${actAttr("liveFit")}>🔍 Encuadrar</button></div>`;
+    html += `<div class="small muted" style="margin:2px 4px 6px"><span class="${stale ? "stale" : "live"}">${stale ? "⚠️ último dato (sin conexión)" : '<span class="dot"></span>en vivo'}</span> · ${list.length} bondi${list.length === 1 ? "" : "s"} en circulación${S.liveSel.size ? " (filtrado)" : ""}</div>`;
+  }
+  const sel = S.sel && S.live.list.find(v => v.key === S.sel);
+  if (sel) {
+    const r = routeOf(sel.routeId), training = isTrainTarget(sel);
+    html += `<div class="selbus" id="selBus">${badge(r)}<span>→ ${esc(sel.trip.tripHeadsign || "")}${sel.vehicleId ? " · interno " + esc(String(sel.vehicleId).split("_").pop()) : ""}</span>
+      <button class="chip lineall" data-go="#/route/${esc(encodeURIComponent(sel.routeId))}">🗺️ Todos los ${esc(lineBase(r))}</button>` +
+      (training ? `<b>🎓 Entrenando</b>` : `<button class="chip train" data-act="trainStart" data-arg="${esc(sel.tripId)}" data-route="${esc(sel.routeId)}" data-veh="${esc(sel.vehicleId)}">🚌 Estoy en este bondi</button>`) + `</div>`;
+  }
+  if (list.length) {
+    html += `<div class="sec">Más cercanos ${ref.me ? "a vos" : "al centro del mapa"}</div>`;
+    if (!ref.me) html += `<div class="small muted" style="margin:0 4px 4px">Tocá ◎ para usar tu ubicación.</div>`;
+    const rows = list.map(v => liveRow(v, ref)).sort((a, b) => a.d - b.d).slice(0, 8);
+    html += `<div id="liveNear">${rows.map(x => x.html).join("")}</div>`;
+    html += `<div class="small muted" style="margin:4px 4px 0">Los “≈ min” son una estimación propia (distancia en línea recta ÷ velocidad del bondi, o ~20 km/h): no es la llegada oficial. Para eso, tocá la parada.</div>`;
+  }
+  html += `<div class="upd" id="upd"></div>`;
+  box.innerHTML = html;
+}
+function drawLive() {
+  if (!S.view || S.view.type !== "home") return;
+  const stale = isStale(), items = [], ref = liveRef();
+  for (const v of liveFiltered()) {
+    const r = routeOf(v.routeId), sel = S.sel === v.key;
+    items.push({ id: v.key, tripId: v.tripId, vehicleId: v.vehicleId, routeId: v.routeId, lat: v.pos.lat, lon: v.pos.lon, t: v.t || now(), bearing: v.orient,
+      old: (v.t && now() - v.t > 180000) || stale, z: sel ? 900 : 600, label: isTrainTarget(v) ? "🎓" : undefined,
+      tip: `${esc(routeLabel(r))} → ${esc(v.trip.tripHeadsign || "")}${v.vehicleId ? " · interno " + esc(String(v.vehicleId).split("_").pop()) : ""}${v.t ? " · GPS " + hhmm(v.t) : ""}` });
+    if (S.polyLoading.size < 3 && dist(ref.p, [v.pos.lat, v.pos.lon]) < 4000) ensureRoutePoly(v.routeId);
+  }
+  syncBuses(items);
+}
+map.on("moveend", () => { if (S.view && S.view.type === "home" && !S.here) renderLiveList(); });
 
 /* ---- parada: arribos en vivo ---- */
 function openStop(id) {
   S.view = { type: "stop", id };
-  if (sheet.classList.contains("min")) setSheet("");
+  if (sheetState === "min") setSheet("mid");
   const known = S.stopsCache[id];
   S.stopFilter = null; S.arrivals = [];
   renderStopHead(known, id);
@@ -1129,14 +1443,22 @@ function openStop(id) {
   startPoll(signal => loadArrivals(id, signal), S.settings.refresh);
 }
 function renderStopHead(s, id) {
-  const fav = S.favs.stops.some(f => f.id === id);
+  const fav = S.favs.stops.some(f => f.id === id), dt = stopDirText(s);
   head(`<button class="iconbtn" ${actAttr("back")} aria-label="Volver">${backSvg}</button>
-    <h2>${esc(s ? s.name : "Parada")}<br><span class="sub">${s && s.code ? "Parada " + esc(s.code) : ""}${s && s.direction ? " · hacia " + esc(s.direction) : ""}</span></h2>
+    <h2>${esc(s ? s.name : "Parada")}<br><span class="sub">${s && s.code ? "Parada " + esc(s.code) : ""}${dt ? " · " + dt : ""}</span></h2>
     <button class="iconbtn star ${fav ? "on" : ""}" ${actAttr("favStop", id)} aria-label="Favorito" aria-pressed="${fav}">${starSvg(fav)}</button>`);
+}
+// Si el servidor no informa el sentido de la parada, se baja el recorrido de sus líneas para inferirlo.
+function inferStopDir(s, id) {
+  if (!s || stopDir(s) || s._dirTried) return;
+  s._dirTried = true;
+  Promise.all((s.routeIds || []).slice(0, 3).map(rid => ensureRoutePoly(rid, true))).then(() => {
+    if (S.view && S.view.type === "stop" && S.view.id === id) { renderStopHead(s, id); renderArrivals(); if (selStopMarker) selStopMarker.setIcon(stopIcon(s, "#f59e0b", true)); }
+  });
 }
 function focusStop(s) {
   if (selStopMarker) map.removeLayer(selStopMarker);
-  selStopMarker = L.circleMarker([s.lat, s.lon], { pane: "selPane", radius: 10, weight: 4, color: "#fff", fillColor: "#f59e0b", fillOpacity: 1 }).addTo(map);
+  selStopMarker = L.marker([s.lat, s.lon], { pane: "selPane", icon: stopIcon(s, "#f59e0b", true), keyboard: false, interactive: false }).addTo(map);
   fitVisible([[s.lat, s.lon]], 16);
 }
 function fitVisible(pts, maxZoom = 16) { map.fitBounds(L.latLngBounds(pts), Object.assign({ maxZoom, animate: !REDUCE_MOTION }, sheetPad())); }
@@ -1145,7 +1467,7 @@ async function loadArrivals(id, signal) {
   if (!S.view || S.view.type !== "stop" || S.view.id !== id) return;
   indexRefs(r.data.references);
   const stop = S.stopsCache[id];
-  if (stop) { renderStopHead(stop, id); if (!selStopMarker) focusStop(stop); }
+  if (stop) { renderStopHead(stop, id); if (!selStopMarker) focusStop(stop); inferStopDir(stop, id); }
   S.arrivals = r.data.entry.arrivalsAndDepartures || [];
   S.situations = (r.data.references && r.data.references.situations) || [];
   S.lastOk = Date.now(); S.connErr = null; S.view.loaded = true;
@@ -1153,8 +1475,8 @@ async function loadArrivals(id, signal) {
   if (stop && !S.view.fitted) {
     S.view.fitted = true;
     const pts = [[stop.lat, stop.lon]];
-    S.arrivals.map(a => [arrTime(a), a]).filter(([t, a]) => t.live && t.t > now() - 60000 && Track.has(a.tripId))
-      .sort((x, y) => x[0].t - y[0].t).slice(0, 2).forEach(([, a]) => pts.push(Track.get(a.tripId).shown));
+    S.arrivals.map(a => [arrTime(a), a]).filter(([t, a]) => t.live && t.t > now() - 60000 && trackFor(a.tripId))
+      .sort((x, y) => x[0].t - y[0].t).slice(0, 2).forEach(([, a]) => pts.push(trackFor(a.tripId).shown));
     fitVisible(pts, 16);
   }
 }
@@ -1166,19 +1488,23 @@ function arrTime(a) {
 function locTime(ts) { return (ts && (ts.lastLocationUpdateTime || ts.lastUpdateTime)) || 0; }
 function renderArrivals() {
   if (!S.view || S.view.type !== "stop") return;
-  const t0 = now(), stale = isStale();
+  const t0 = now(), stale = isStale(), stop = S.stopsCache[S.view.id];
   let list = S.arrivals.map(a => Object.assign({ _: arrTime(a) }, a)).filter(a => a._.t >= t0 - 60000).sort((a, b) => a._.t - b._.t);
-  const lines = [...new Map(list.map(a => [a.routeId, routeOf(a.routeId, a.routeShortName)])).values()];
-  if (S.stopFilter && !lines.some(r => r.id === S.stopFilter)) S.stopFilter = null;
-  if (S.stopFilter) list = list.filter(a => a.routeId === S.stopFilter);
+  // Chips por LÍNEA (número base): "50" junta 50A/50B/50C; "21" junta sus dos routeId (ida y vuelta).
+  const lines = new Map();
+  for (const a of list) { const r = routeOf(a.routeId, a.routeShortName), k = lineKey(r); if (!lines.has(k)) lines.set(k, { key: k, r, base: lineBase(r), routeId: a.routeId }); }
+  if (S.stopFilter && !lines.has(S.stopFilter)) S.stopFilter = null;
+  if (S.stopFilter) list = list.filter(a => lineKey(routeOf(a.routeId, a.routeShortName)) === S.stopFilter);
   let html = errBox();
   for (const sit of S.situations || []) {
     const txt = (sit.summary && sit.summary.value) || (sit.description && sit.description.value);
     if (txt) html += `<div class="alert">⚠️ ${esc(txt)}</div>`;
   }
-  if (lines.length > 1) html += `<div class="chips"><button class="chip ${S.stopFilter ? "" : "on"}" ${actAttr("filter", "")}>Todas</button>${lines.map(r => `<button class="chip ${S.stopFilter === r.id ? "on" : ""}" ${actAttr("filter", r.id)}>${esc(routeLabel(r))}</button>`).join("")}</div>`;
-  // Acceso directo a la vista de línea: TODAS las unidades de esa línea en el mapa.
-  if (lines.length) html += `<div class="chips">${lines.map(r => `<button class="chip lineall" data-go="#/route/${esc(encodeURIComponent(r.id))}" aria-label="Ver todos los bondis de la línea ${esc(routeLabel(r))} en el mapa">🗺️ Todos los ${esc(routeLabel(r))}</button>`).join("")}</div>`;
+  if (stop) html += `<div class="dirnote" id="stopDir">${stopDirText(stop, true)}</div>`;
+  const L_ = [...lines.values()];
+  if (L_.length > 1) html += `<div class="chips"><button class="chip ${S.stopFilter ? "" : "on"}" ${actAttr("filter", "")}>Todas</button>${L_.map(e => `<button class="chip ${S.stopFilter === e.key ? "on" : ""}" ${actAttr("filter", e.key)}>${esc(e.base)}</button>`).join("")}</div>`;
+  // Acceso directo a la vista de línea: TODAS las unidades de esa línea (todos los ramales y sentidos).
+  if (L_.length) html += `<div class="chips">${L_.map(e => `<button class="chip lineall" data-go="#/route/${esc(encodeURIComponent(e.routeId))}" aria-label="Ver todos los bondis de la línea ${esc(e.base)} en el mapa">🗺️ Todos los ${esc(e.base)}</button>`).join("")}</div>`;
   html += `<div id="arrList">`;
   if (!list.length) html += `<div class="note">No hay arribos informados para las próximas 2 horas.<div>${gridLink()}</div></div>`;
   else if (!list.some(a => a._.live)) html += `<div class="small muted" style="margin:0 4px 6px">Ningún bondi con GPS en vivo para esta parada ahora. ${gridLink()}</div>`;
@@ -1192,11 +1518,11 @@ function renderArrivals() {
       if (loc) meta.push(`<span data-loc="${loc}">GPS hace ${fmtAgo(now() - loc)}</span>`);
     } else meta.push(`<span class="sched">programado ${hhmm(a._.t)}</span>`);
     if (a.numberOfStopsAway > 0 && a.numberOfStopsAway < 80) meta.push(`${a.numberOfStopsAway} parada${a.numberOfStopsAway > 1 ? "s" : ""}`);
-    if (a.distanceFromStop > 0 && a._.live) meta.push(`<span data-dist="${Math.round(a.distanceFromStop)}" data-trip="${esc(a.tripId)}">${fmtDist(a.distanceFromStop)}</span>`);
-    const training = TR.session && TR.session.tripId === a.tripId;
+    if (a.distanceFromStop > 0 && a._.live) meta.push(`<span data-dist="${Math.round(a.distanceFromStop)}" data-trip="${esc(a.vehicleId || a.tripId)}">${fmtDist(a.distanceFromStop)}</span>`);
+    const training = isTrainTarget({ tripId: a.tripId, vehicleId: a.vehicleId });
     const trainBtn = training ? `<div class="trainrow small"><b>🎓 Entrenando con este bondi</b></div>`
-      : (S.selTrip === a.tripId && a._.live && ts.position) ? `<div class="trainrow"><button class="chip train" data-act="trainStart" data-arg="${esc(a.tripId)}" data-route="${esc(a.routeId)}" aria-label="Estoy en este bondi: entrenar el interpolado con el GPS del celu">🚌 Estoy en este bondi</button></div>` : "";
-    html += `<div class="arr${S.selTrip === a.tripId ? " sel" : ""}" role="button" tabindex="0" ${actAttr("pick", a.tripId)}>
+      : (S.sel === a.tripId && a._.live && ts.position) ? `<div class="trainrow"><button class="chip train" data-act="trainStart" data-arg="${esc(a.tripId)}" data-route="${esc(a.routeId)}" data-veh="${esc(a.vehicleId || "")}" aria-label="Estoy en este bondi: entrenar el interpolado con el GPS del celu">🚌 Estoy en este bondi</button></div>` : "";
+    html += `<div class="arr${S.sel === a.tripId ? " sel" : ""}" role="button" tabindex="0" ${actAttr("pick", a.tripId)}>
       ${badge(r)}
       <div class="mid"><div class="hs">${esc(a.tripHeadsign || r.longName || "")}</div><div class="meta">${meta.join(" · ")}</div>${trainBtn}</div>
       <div class="eta"><b class="${a._.live && !stale ? "" : "sched-n"}" data-t="${a._.t}"></b><small></small></div></div>`;
@@ -1210,132 +1536,190 @@ function drawArrivalBuses() {
   const items = [], seen = new Set(), stop = S.stopsCache[S.view.id], stale = isStale();
   for (const a of S.arrivals) {
     const ts = a.tripStatus; if (!ts || !ts.position || !ts.position.lat || !arrTime(a).live) continue;
-    if (S.stopFilter && a.routeId !== S.stopFilter) continue;
-    if (seen.has(a.tripId)) continue; seen.add(a.tripId);
-    const r = routeOf(a.routeId, a.routeShortName), loc = locTime(ts);
+    const r = routeOf(a.routeId, a.routeShortName);
+    if (S.stopFilter && lineKey(r) !== S.stopFilter) continue;
+    const id = a.vehicleId || a.tripId;           // por interno: dos unidades del mismo viaje no se pisan
+    if (seen.has(id)) continue; seen.add(id);
+    const loc = locTime(ts);
     // Si se acerca a esta parada, no extrapolar más allá de ella (dejamos 15 m).
     const maxAhead = a.distanceFromStop > 0 && stop ? Math.min(a.distanceFromStop, dist([ts.position.lat, ts.position.lon], [stop.lat, stop.lon]) + 30) - 15 : NaN;
-    items.push({ id: a.tripId, routeId: a.routeId, lat: ts.position.lat, lon: ts.position.lon, t: loc || now(), bearing: ts.orientation,
-      old: (loc && now() - loc > 180000) || stale, z: S.selTrip === a.tripId ? 900 : 500, maxAhead,
+    items.push({ id, tripId: a.tripId, vehicleId: a.vehicleId || "", routeId: a.routeId, lat: ts.position.lat, lon: ts.position.lon, t: loc || now(), bearing: ts.orientation,
+      old: (loc && now() - loc > 180000) || stale, z: S.sel === a.tripId ? 900 : 500, maxAhead,
       tip: `${esc(routeLabel(r))} → ${esc(a.tripHeadsign || "")}` });
     ensureRoutePoly(a.routeId);
   }
   syncBuses(items);
 }
 
-/* ---- línea: recorrido + TODAS las unidades en vivo ---- */
-// Se entra con #/route/<id>: desde la búsqueda, favoritos, la lista de paradas o el chip
-// "🗺️ Todos los <línea>" de una parada. Muestra en el mapa todas las unidades que devuelve
-// trips-for-route (ambos sentidos), refrescadas cada routeRefresh s e interpoladas.
+/* ---- línea: TODOS los ramales y sentidos + TODAS las unidades en vivo ---- */
+// Se entra con #/route/<id> (cualquier routeId de la línea): desde la búsqueda, favoritos, el mapa en vivo o el
+// chip "🗺️ Todos los <línea>" de una parada. Se juntan todos los routeId de la misma empresa y número base
+// (21 = ida + vuelta; 50 = 50A + 50B + 50C, cada uno con sus sentidos) y se muestran TODAS sus unidades.
+async function agencyRoutes(aid) {
+  if (S.routesByAgency[aid] && S.routesByAgency[aid].length) return S.routesByAgency[aid];
+  const cached = ls("routes." + aid);
+  if (cached && Date.now() - cached.at < 3 * 864e5 && cached.list.length) { S.routesByAgency[aid] = cached.list; cached.list.forEach(r => S.routes[r.id] = S.routes[r.id] || r); return cached.list; }
+  try {
+    const r = await api("routes-for-agency/" + encodeURIComponent(aid));
+    const lst = (r.data.list || []).map(x => ({ id: x.id, shortName: x.shortName, longName: x.longName, description: x.description, color: x.color, textColor: x.textColor, agencyId: x.agencyId || aid }));
+    S.routesByAgency[aid] = lst; lst.forEach(x => S.routes[x.id] = S.routes[x.id] || x);
+    ls("routes." + aid, { at: Date.now(), list: lst });
+    return lst;
+  } catch (e) { S.routesByAgency[aid] = S.routesByAgency[aid] || []; return []; }
+}
+async function routeEntry(rid) {
+  if (S.routeEntries[rid]) return S.routeEntries[rid];
+  const r = await api("stops-for-route/" + encodeURIComponent(rid), { includePolylines: true });
+  indexRefs(r.data.references);
+  S.routeEntries[rid] = r.data.entry;
+  storeRoutePolys(rid, r.data.entry);
+  return r.data.entry;
+}
+function groupsOf(rid, e) {
+  const out = [], all = (e.polylines || []).map(p => decodePoly(p.points));
+  for (const g of e.stopGroupings || []) for (const sg of g.stopGroups || [])
+    out.push({ routeId: rid, gi: out.length, name: (sg.name && (sg.name.name || (sg.name.names || [])[0])) || "", stopIds: sg.stopIds || [], polys: (sg.polylines || []).map(p => decodePoly(p.points)), all });
+  if (!out.length) out.push({ routeId: rid, gi: 0, name: "", stopIds: e.stopIds || [], polys: [], all });
+  return out;
+}
 async function openRoute(id) {
-  S.view = { type: "route", id }; S.routeDir = ls("dir." + id) || 0; S.routeData = null; S.vehicles = [];
-  S.routeAll = ls("routeAll") !== false;   // por defecto: todas las unidades, ambos sentidos
-  if (TR.session && TR.session.routeId === id) S.selTrip = TR.session.tripId;
+  S.view = { type: "route", id }; S.routeData = null; S.vehicles = [];
+  S.routeAll = ls("routeAll") !== false;   // por defecto: todas las unidades, todos los ramales y sentidos
   stopLayer.clearLayers();
-  if (sheet.classList.contains("min")) setSheet("");
+  if (sheetState === "min") setSheet("mid");
   renderRouteHead(id);
   body(`<div class="note"><span class="spin"></span> Cargando recorrido…</div>`);
   try {
-    const r = await api("stops-for-route/" + encodeURIComponent(id), { includePolylines: true });
+    const e0 = await routeEntry(id);
     if (!S.view || S.view.id !== id) return;
-    indexRefs(r.data.references);
-    const e = r.data.entry, groups = [];
-    for (const g of e.stopGroupings || []) for (const sg of g.stopGroups || []) groups.push({ id: sg.id, name: (sg.name && (sg.name.name || (sg.name.names || [])[0])) || "", stopIds: sg.stopIds || [], polys: (sg.polylines || []).map(p => decodePoly(p.points)) });
-    if (!groups.length) groups.push({ id: "0", name: "", stopIds: e.stopIds || [], polys: [] });
-    const allPolys = (e.polylines || []).map(p => decodePoly(p.points));
-    S.routeData = { id, groups, allPolys };
-    storeRoutePolys(id, e);
-    if (S.routeDir >= groups.length) S.routeDir = 0;
+    const r0 = S.routes[id] || { id }, key = lineKey(r0), aid = agencyOf(r0);
+    const same = (await agencyRoutes(aid)).filter(x => lineKey(x) === key).map(x => x.id);
+    const members = [...new Set([id, ...same])].sort((a, b) => byLabel(routeLabel(S.routes[a] || { id: a }), routeLabel(S.routes[b] || { id: b })) || byLabel(a, b));
+    const entries = await Promise.all(members.map(rid => rid === id ? e0 : routeEntry(rid).catch(() => null)));
+    if (!S.view || S.view.id !== id) return;
+    const ids = members.filter((rid, i) => entries[i]), groups = [];
+    for (const rid of ids) groups.push(...groupsOf(rid, S.routeEntries[rid]));
+    const variants = [...new Set(ids.map(x => routeLabel(S.routes[x] || { id: x })))].sort(byLabel);
+    S.routeData = { id, key, ids, groups, variants, agencyId: aid, base: lineBase(r0) };
+    const first = Math.max(0, groups.findIndex(g => g.routeId === id)), saved = ls("dir." + key);
+    S.routeDir = Number.isInteger(saved) && groups[saved] && groups[saved].routeId === id ? saved : first;
+    if (TR.session && ids.includes(TR.session.routeId)) S.sel = TR.session.vehicleId || TR.session.tripId;
     renderRouteHead(id); drawRoute(true); renderRouteList(); S.view.loaded = true;
-    startPoll(signal => loadRouteVehicles(id, signal), S.settings.routeRefresh);
+    startPoll(signal => loadRouteVehicles(signal), S.settings.routeRefresh);
   } catch (e) { if (S.view && S.view.id === id) body(`<div class="note err">${errMsg(e)}<div class="row" style="margin-top:8px"><button class="btn ghost" data-act="retry">Reintentar</button></div><div>${gridLink()}</div></div>`); }
 }
 function renderRouteHead(id) {
-  const r = S.routes[id] || { id }, fav = S.favs.routes.some(f => f.id === id);
+  const r = S.routes[id] || { id }, fav = S.favs.routes.some(f => f.id === id), d = S.routeData && S.routeData.id === id ? S.routeData : null;
+  const many = d && d.ids.length > 1;
+  const title = many ? `Línea ${d.base}${d.variants.length > 1 ? " · " + d.variants.join(", ") : ""}` : (r.longName || r.description || "Línea " + routeLabel(r));
+  const sub = (S.agencyName[r.agencyId] || "") + (many ? ` · ${d.variants.length > 1 ? "todos los ramales y sentidos" : "ambos sentidos"}` : "");
   head(`<button class="iconbtn" ${actAttr("back")} aria-label="Volver">${backSvg}</button>
-    ${badge(r)}<h2>${esc(r.longName || r.description || "Línea " + routeLabel(r))}<br><span class="sub">${esc(S.agencyName[r.agencyId] || "")}</span></h2>
+    ${badge(many ? { id, shortName: d.base, agencyId: r.agencyId, color: r.color } : r)}<h2>${esc(title)}<br><span class="sub">${esc(sub)}</span></h2>
     <button class="iconbtn star ${fav ? "on" : ""}" ${actAttr("favRoute", id)} aria-label="Favorito" aria-pressed="${fav}">${starSvg(fav)}</button>`);
+}
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+function groupName(g) {
+  const d = S.routeData, nm = String(g.name || "").split(" - ").pop().replace(/^hacia\s+/i, "").trim();
+  const many = d.groups.filter(x => x.routeId === g.routeId).length > 1;
+  const dir = nm ? "hacia " + nm : many ? "sentido " + (g.gi + 1) : "recorrido";
+  return d.variants.length > 1 ? routeLabel(S.routes[g.routeId] || { id: g.routeId }) + " · " + dir : cap(dir);
 }
 function drawRoute(fit) {
   routeLayer.clearLayers();
   const d = S.routeData; if (!d) return;
-  const r = S.routes[d.id] || { id: d.id }, col = routeColor(r), g = d.groups[S.routeDir];
-  const polys = g.polys.length ? g.polys : d.allPolys, all = [];
-  // Con "todas las unidades", el recorrido completo de la línea va de fondo (fino) para ubicar las del otro sentido.
-  if (S.routeAll) for (const p of d.allPolys) L.polyline(p, { color: col, weight: 3, opacity: .3, interactive: false }).addTo(routeLayer);
-  for (const p of polys) { L.polyline(p, { color: col, weight: 5, opacity: .85 }).addTo(routeLayer); all.push(...p); }
+  const g = d.groups[S.routeDir], col = routeColor(S.routes[g.routeId] || { id: g.routeId }), all = [];
+  // Con "todas las unidades", los recorridos de TODOS los ramales/sentidos van de fondo (finos).
+  if (S.routeAll) for (const x of d.groups) for (const p of (x.polys.length ? x.polys : x.all)) { L.polyline(p, { color: col, weight: 3, opacity: .3, interactive: false }).addTo(routeLayer); all.push(...p); }
+  for (const p of (g.polys.length ? g.polys : g.all)) { L.polyline(p, { color: col, weight: 5, opacity: .85 }).addTo(routeLayer); all.push(...p); }
   for (const sid of g.stopIds) {
     const s = S.stopsCache[sid]; if (!s) continue;
     all.push([s.lat, s.lon]);
-    L.circleMarker([s.lat, s.lon], { radius: 4.5, weight: 2, color: col, fillColor: "#fff", fillOpacity: 1 })
-      .bindTooltip(esc(s.name)).on("click", () => go("#/stop/" + encodeURIComponent(sid))).addTo(routeLayer);
+    const dt = stopDirText(s);
+    L.marker([s.lat, s.lon], { icon: stopIcon(s, col), zIndexOffset: -200, keyboard: false })
+      .bindTooltip(esc(s.name) + (dt ? "<br>" + dt : "")).on("click", () => go("#/stop/" + encodeURIComponent(sid))).addTo(routeLayer);
   }
-  if (S.routeAll) for (const p of d.allPolys) all.push(...p);
   if (fit && all.length) map.fitBounds(L.latLngBounds(all), Object.assign({ animate: !REDUCE_MOTION }, sheetPad()));
 }
-async function loadRouteVehicles(id, signal) {
-  const r = await api("trips-for-route/" + encodeURIComponent(id), { includeStatus: true, includeSchedule: false }, signal);
-  if (!S.view || S.view.id !== id) return;
-  indexRefs(r.data.references);
-  const trips = {}; for (const t of (r.data.references && r.data.references.trips) || []) trips[t.id] = t;
-  S.vehicles = (r.data.list || []).map(x => {
-    const st = x.status || {}; const trip = trips[x.tripId] || trips[st.activeTripId] || {};
-    return { tripId: x.tripId || st.activeTripId, trip, st, pos: st.position, dir: trip.directionId };
-  }).filter(v => v.tripId && v.pos && v.pos.lat);
+// Un pedido vehicles-for-agency (todas las unidades de la empresa, se filtran las de la línea).
+// Si la empresa no lo publica (404), plan B: trips-for-route por cada routeId de la línea.
+async function loadRouteVehicles(signal) {
+  const d = S.routeData; if (!d) return;
+  let list = null;
+  if (!S.noVfa[d.agencyId]) {
+    try { list = vehiclesFromVfa(await api("vehicles-for-agency/" + encodeURIComponent(d.agencyId), {}, signal)); }
+    catch (e) { if (isNotFound(e)) S.noVfa[d.agencyId] = true; else throw e; }
+  }
+  if (!list) {
+    const rs = await Promise.all(d.ids.map(rid => api("trips-for-route/" + encodeURIComponent(rid), { includeStatus: true, includeSchedule: false }, signal).then(r => vehiclesFromTfr(r, rid))));
+    const seen = new Set(); list = rs.flat().filter(v => !seen.has(v.key) && seen.add(v.key));
+  }
+  if (S.routeData !== d || !S.view || S.view.type !== "route") return;
+  S.vehicles = list.filter(v => d.ids.includes(v.routeId));
+  // Sesión de entrenamiento iniciada sin interno conocido: se completa si el viaje tiene UNA sola unidad.
+  if (TR.session && !TR.session.vehicleId) { const m = S.vehicles.filter(v => v.tripId === TR.session.tripId && v.vehicleId); if (m.length === 1) { TR.session.vehicleId = m[0].vehicleId; ls("trainSession", TR.session); } }
   S.lastOk = Date.now(); S.connErr = null;
   renderRouteList(); drawVehicles();
 }
 function vehInGroup(v, g) {
+  if (!g || v.routeId !== g.routeId) return false;
+  if (S.routeData.groups.filter(x => x.routeId === g.routeId).length < 2) return true;
   const ns = v.st.nextStop || v.st.closestStop;
   if (ns && g.stopIds.includes(ns)) return true;
-  if (!ns && v.dir != null) return String(v.dir) === String(S.routeDir);
+  if (!ns && v.dir != null) return String(v.dir) === String(g.gi);
   return false;
+}
+const isSel = v => !!S.sel && (v.key === S.sel || v.tripId === S.sel);
+function busRow(v, col, extra = "") {
+  const loc = v.t || locTime(v.st), dev = v.st.scheduleDeviation ? Math.round(v.st.scheduleDeviation / 60) : 0;
+  return `<div class="rbus${isSel(v) ? " sel" : ""}" style="--rc:${col}" role="button" tabindex="0" ${actAttr("bus", v.key)}><div class="rail"><div class="bus"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2v2h-3v-2H8v2H5v-2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 3v5h14V7z"/></svg></div></div>
+    <div class="txt">${extra}${esc(v.trip.tripHeadsign || "")}${dev ? ` · <span class="${dev > 0 ? "late" : "early"}">${Math.abs(dev)} min ${dev > 0 ? "tarde" : "antes"}</span>` : ""}${loc ? ` · <span class="muted" data-loc="${loc}">GPS hace ${fmtAgo(now() - loc)}</span>` : ""}</div></div>`;
 }
 function renderRouteList() {
   const d = S.routeData; if (!d || !S.view || S.view.type !== "route") return;
-  const vehicles = S.vehicles || [], stale = isStale();
-  const r = S.routes[d.id] || { id: d.id }, col = routeColor(r), g = d.groups[S.routeDir];
+  const vehicles = S.vehicles || [], stale = isStale(), g = d.groups[S.routeDir];
+  const col = routeColor(S.routes[g.routeId] || { id: g.routeId });
   let html = errBox();
-  if (d.groups.length > 1) html += `<div class="chips">${d.groups.map((x, i) => `<button class="chip ${i === S.routeDir ? "on" : ""}" ${actAttr("dir", i)}>${esc(x.name ? "Hacia " + x.name.replace(/^hacia\s+/i, "") : "Sentido " + (i + 1))}</button>`).join("")}</div>`;
+  if (d.groups.length > 1) html += `<div class="chips" id="dirChips">${d.groups.map((x, i) => `<button class="chip ${i === S.routeDir ? "on" : ""}" ${actAttr("dir", i)}>${esc(groupName(x))}</button>`).join("")}</div>`;
   const mine = vehicles.filter(v => vehInGroup(v, g));
   html += `<div class="chips" id="scopeChips"><button class="chip ${S.routeAll ? "on" : ""}" ${actAttr("scope", "all")} aria-pressed="${!!S.routeAll}">Todas las unidades (${vehicles.length})</button><button class="chip ${S.routeAll ? "" : "on"}" ${actAttr("scope", "dir")} aria-pressed="${!S.routeAll}">Solo este sentido (${mine.length})</button><button class="chip" ${actAttr("fitBuses")}>🔍 Encuadrar bondis</button></div>`;
+  const per = d.variants.length > 1 ? " · " + d.variants.map(lb => `${lb}: ${vehicles.filter(v => routeLabel(S.routes[v.routeId] || { id: v.routeId }) === lb).length}`).join(", ") : "";
   html += `<div class="small muted" id="routeSummary" style="margin:2px 4px 8px">${vehicles.length
-    ? `<span class="${stale ? "stale" : "live"}">${stale ? "⚠️ último dato (sin conexión)" : '<span class="dot"></span>en vivo'}</span> · ${vehicles.length} en circulación en la línea, ${mine.length} en este sentido${S.routeAll && vehicles.length > mine.length ? " (las del otro sentido, más claras)" : ""}`
+    ? `<span class="${stale ? "stale" : "live"}">${stale ? "⚠️ último dato (sin conexión)" : '<span class="dot"></span>en vivo'}</span> · ${vehicles.length} en circulación en la línea ${esc(d.base)}${per}, ${mine.length} en este sentido${S.routeAll && vehicles.length > mine.length ? " (las otras, más claras)" : ""}`
     : (S.lastOk ? `Sin bondis con GPS en esta línea ahora. ${gridLink()}` : "Buscando unidades…")}</div>`;
-  const sel = S.selTrip && vehicles.find(v => v.tripId === S.selTrip);
+  const sel = vehicles.find(isSel);
   if (sel) {
-    const training = TR.session && TR.session.tripId === sel.tripId;
-    html += `<div class="selbus" id="selBus">${badge(r)}<span>${esc(sel.trip.tripHeadsign || "")}${sel.st.vehicleId ? " · interno " + esc(String(sel.st.vehicleId).split("_").pop()) : ""}${vehInGroup(sel, g) ? "" : " · otro sentido"}</span>` +
-      (training ? `<b>🎓 Entrenando con este bondi</b>` : `<button class="chip train" data-act="trainStart" data-arg="${esc(sel.tripId)}" data-route="${esc(d.id)}" aria-label="Estoy en este bondi: entrenar el interpolado con el GPS del celu">🚌 Estoy en este bondi</button>`) + `</div>`;
+    const training = isTrainTarget(sel);
+    html += `<div class="selbus" id="selBus">${badge(routeOf(sel.routeId))}<span>${esc(sel.trip.tripHeadsign || "")}${sel.vehicleId ? " · interno " + esc(String(sel.vehicleId).split("_").pop()) : ""}${vehInGroup(sel, g) ? "" : " · otro sentido/ramal"}</span>` +
+      (training ? `<b>🎓 Entrenando con este bondi</b>` : `<button class="chip train" data-act="trainStart" data-arg="${esc(sel.tripId)}" data-route="${esc(sel.routeId)}" data-veh="${esc(sel.vehicleId)}" aria-label="Estoy en este bondi: entrenar el interpolado con el GPS del celu">🚌 Estoy en este bondi</button>`) + `</div>`;
   } else if (vehicles.length && !TR.session) html += `<div class="small muted" style="margin:0 4px 8px">¿Vas arriba de uno? Tocalo en el mapa o en la lista y elegí “🚌 Estoy en este bondi” para entrenar el interpolado.</div>`;
-  const byNext = {};
+  const byNext = {}, placed = new Set();
   for (const v of mine) { const k = v.st.nextStop || v.st.closestStop || "?"; (byNext[k] = byNext[k] || []).push(v); }
+  let rail = "";
   g.stopIds.forEach((sid, i) => {
-    for (const v of byNext[sid] || []) {
-      const loc = locTime(v.st);
-      const dev = v.st.scheduleDeviation ? Math.round(v.st.scheduleDeviation / 60) : 0;
-      html += `<div class="rbus${S.selTrip === v.tripId ? " sel" : ""}" style="--rc:${col}" role="button" tabindex="0" ${actAttr("bus", v.tripId)}><div class="rail"><div class="bus"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2v2h-3v-2H8v2H5v-2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 3v5h14V7z"/></svg></div></div>
-        <div class="txt">${esc(v.trip.tripHeadsign || "")}${dev ? ` · <span class="${dev > 0 ? "late" : "early"}">${Math.abs(dev)} min ${dev > 0 ? "tarde" : "antes"}</span>` : ""}${loc ? ` · <span class="muted" data-loc="${loc}">GPS hace ${fmtAgo(now() - loc)}</span>` : ""}</div></div>`;
-    }
-    const s = S.stopsCache[sid] || { name: sid };
-    html += `<div class="rstop ${i === 0 ? "first" : ""} ${i === g.stopIds.length - 1 ? "last" : ""}" style="--rc:${col}" ${goAttr("#/stop/" + encodeURIComponent(sid))}><div class="rail"><i></i></div><div class="nm">${esc(s.name)}${s.code ? ` <span class="muted small">${esc(s.code)}</span>` : ""}</div></div>`;
+    for (const v of byNext[sid] || []) { rail += busRow(v, col); placed.add(v.key); }
+    const s = S.stopsCache[sid] || { name: sid }, dt = stopDirText(s);
+    rail += `<div class="rstop ${i === 0 ? "first" : ""} ${i === g.stopIds.length - 1 ? "last" : ""}" style="--rc:${col}" ${goAttr("#/stop/" + encodeURIComponent(sid))}><div class="rail"><i></i></div><div class="nm">${esc(s.name)}${s.code ? ` <span class="muted small">${esc(s.code)}</span>` : ""}${dt ? ` <span class="muted small">· ${dt}</span>` : ""}</div></div>`;
   });
+  const loose = mine.filter(v => !placed.has(v.key)), others = vehicles.filter(v => !vehInGroup(v, g));
+  if (loose.length) html += `<div class="sec">En este sentido (sin próxima parada informada)</div>` + loose.map(v => busRow(v, col)).join("");
+  if (others.length) html += `<div class="sec">En otros sentidos${d.variants.length > 1 ? " y ramales" : ""} (${others.length})</div>` + others.map(v => busRow(v, routeColor(routeOf(v.routeId)), badge(routeOf(v.routeId)) + " → ")).join("");
+  html += `<div class="sec">${esc(groupName(g))}: paradas</div>` + rail;
   html += `<div class="upd" id="upd"></div>`;
   const sc = $("#body").scrollTop; body(html); $("#body").scrollTop = sc;
   tick();
 }
-// TODAS las unidades de la línea en el mapa (las del otro sentido, semitransparentes), con marcadores reusados.
+// TODAS las unidades de la línea en el mapa (las de otros sentidos/ramales, semitransparentes), con marcadores reusados.
 function drawVehicles() {
   const d = S.routeData; if (!d) return;
-  const r = S.routes[d.id] || { id: d.id }, g = d.groups[S.routeDir], stale = isStale(), items = [];
+  const g = d.groups[S.routeDir], stale = isStale(), items = [];
   for (const v of S.vehicles || []) {
     const inG = vehInGroup(v, g);
     if (!S.routeAll && !inG) continue;
-    const loc = locTime(v.st);
-    items.push({ id: v.tripId, routeId: d.id, lat: v.pos.lat, lon: v.pos.lon, t: loc || now(), bearing: v.st.orientation,
-      old: (loc && now() - loc > 180000) || stale, faded: !inG && S.selTrip !== v.tripId, z: S.selTrip === v.tripId ? 900 : inG ? 800 : 400,
-      label: TR.session && TR.session.tripId === v.tripId ? "🎓" : undefined,
-      tip: `${esc(routeLabel(r))} → ${esc(v.trip.tripHeadsign || "")}${v.st.vehicleId ? " · interno " + esc(String(v.st.vehicleId).split("_").pop()) : ""}${loc ? " · GPS " + hhmm(loc) : ""}${inG ? "" : " · otro sentido"}` });
+    const r = routeOf(v.routeId), loc = v.t || locTime(v.st), sel = isSel(v);
+    items.push({ id: v.key, tripId: v.tripId, vehicleId: v.vehicleId, routeId: v.routeId, lat: v.pos.lat, lon: v.pos.lon, t: loc || now(), bearing: v.orient,
+      old: (loc && now() - loc > 180000) || stale, faded: !inG && !sel, z: sel ? 900 : inG ? 800 : 400,
+      label: isTrainTarget(v) ? "🎓" : undefined,
+      tip: `${esc(routeLabel(r))} → ${esc(v.trip.tripHeadsign || "")}${v.vehicleId ? " · interno " + esc(String(v.vehicleId).split("_").pop()) : ""}${loc ? " · GPS " + hhmm(loc) : ""}${inG ? "" : " · otro sentido/ramal"}` });
   }
   syncBuses(items);
 }
@@ -1354,29 +1738,24 @@ function nearAgencies(maxKm = 60, maxN = 25) {
 }
 async function ensureRoutes() {
   const todo = nearAgencies().filter(a => !S.routesByAgency[a.id]);
-  for (let i = 0; i < todo.length; i += 4) {
-    await Promise.all(todo.slice(i, i + 4).map(async a => {
-      const cached = ls("routes." + a.id);
-      if (cached && Date.now() - cached.at < 3 * 864e5) { S.routesByAgency[a.id] = cached.list; cached.list.forEach(r => S.routes[r.id] = S.routes[r.id] || r); return; }
-      try {
-        const r = await api("routes-for-agency/" + encodeURIComponent(a.id));
-        const lst = (r.data.list || []).map(x => ({ id: x.id, shortName: x.shortName, longName: x.longName, description: x.description, color: x.color, textColor: x.textColor, agencyId: x.agencyId || a.id }));
-        S.routesByAgency[a.id] = lst; lst.forEach(x => S.routes[x.id] = S.routes[x.id] || x);
-        ls("routes." + a.id, { at: Date.now(), list: lst });
-      } catch (e) { S.routesByAgency[a.id] = []; }
-    }));
-  }
+  for (let i = 0; i < todo.length; i += 4) await Promise.all(todo.slice(i, i + 4).map(a => agencyRoutes(a.id)));
 }
 const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-const routeRow = r => `<div class="ri" ${goAttr("#/route/" + encodeURIComponent(r.id))} data-close="1">${badge(r)}<div class="mid"><div class="t">${esc(r.longName || r.description || "Línea " + routeLabel(r))}</div><div class="s">${esc(S.agencyName[r.agencyId] || "")} · ver todos los bondis</div></div></div>`;
+// Un renglón por LÍNEA (empresa + número base): "50" = 50A, 50B, 50C; "21" = sus dos routeId (ida/vuelta).
+function lineRow(rs) {
+  const r = rs[0], base = lineBase(r), vars = [...new Set(rs.map(routeLabel))].sort(byLabel);
+  const t = rs.length > 1 ? `Línea ${base}${vars.length > 1 ? " · " + vars.join(", ") : ""}` : (r.longName || r.description || "Línea " + routeLabel(r));
+  return `<div class="ri" ${goAttr("#/route/" + encodeURIComponent(r.id))} data-close="1">${badge(rs.length > 1 ? { id: r.id, shortName: base, agencyId: r.agencyId, color: r.color } : r)}<div class="mid"><div class="t">${esc(t)}</div><div class="s">${esc(S.agencyName[r.agencyId] || "")}${vars.length > 1 ? ` · ${vars.length} ramales` : ""} · ver todos los bondis</div></div></div>`;
+}
+function lineRows(hits) { const m = new Map(); for (const r of hits) { const k = lineKey(r); if (!m.has(k)) m.set(k, []); m.get(k).push(r); } return [...m.values()].slice(0, 25).map(lineRow).join(""); }
 async function doSearch() {
   const text = q.value.trim(), my = ++searchSeq;
   if (!text) { results.classList.remove("show"); return; }
   const n = norm(text), near = new Set(nearAgencies().map(a => a.id));
   const pool = Object.values(S.routes).filter(r => !r.agencyId || near.size === 0 || near.has(r.agencyId));
-  const score = r => { const sn = norm(r.shortName), ln = norm(r.longName) + " " + norm(r.description); return sn === n ? 0 : sn.startsWith(n) ? 1 : sn.includes(n) ? 2 : ln.includes(n) ? 3 : 9; };
-  const hits = pool.map(r => [score(r), r]).filter(x => x[0] < 9).sort((a, b) => a[0] - b[0] || String(a[1].shortName).localeCompare(String(b[1].shortName), "es", { numeric: true })).slice(0, 25).map(x => x[1]);
-  let html = hits.map(routeRow).join("");
+  const score = r => { const sn = norm(r.shortName), b = norm(lineBase(r)), ln = norm(r.longName) + " " + norm(r.description); return b === n || sn === n ? 0 : sn.startsWith(n) ? 1 : sn.includes(n) ? 2 : ln.includes(n) ? 3 : 9; };
+  const hits = pool.map(r => [score(r), r]).filter(x => x[0] < 9).sort((a, b) => a[0] - b[0] || byLabel(a[1].shortName, b[1].shortName) || byLabel(a[1].id, b[1].id)).slice(0, 80).map(x => x[1]);
+  let html = lineRows(hits);
   results.innerHTML = html || `<div class="ri muted"><span class="spin"></span> Buscando…</div>`;
   results.classList.add("show");
   const c = map.getCenter();
@@ -1389,7 +1768,7 @@ async function doSearch() {
     if (rr) { indexRefs(rr.data.references); for (const r of rr.data.list || []) { S.routes[r.id] = r; if (!hits.some(h => h.id === r.id)) hits.push(r); } }
     let extra = "";
     if (ss) { indexRefs(ss.data.references); for (const s of (ss.data.list || []).slice(0, 8)) { S.stopsCache[s.id] = s; extra += `<div class="ri" ${goAttr("#/stop/" + encodeURIComponent(s.id))} data-close="1"><span class="badge" style="background:#0f766e">P</span><div class="mid"><div class="t">${esc(s.name)}</div><div class="s">Parada ${esc(s.code || s.id)}</div></div></div>`; } }
-    html = hits.slice(0, 25).map(routeRow).join("") + extra;
+    html = lineRows(hits) + extra;
     results.innerHTML = html || `<div class="ri muted">Nada con «${esc(text)}» cerca de esta zona.</div>`;
   } catch (e) { if (!html) results.innerHTML = `<div class="ri">${errMsg(e)}</div>`; }
 }
@@ -1449,6 +1828,7 @@ function openSettings() {
   body(`
     <label class="f" for="sRef">Refresco en la parada (segundos)</label><input id="sRef" type="number" min="1" max="600" step="1" inputmode="numeric" value="${esc(st.refresh)}"><div class="hint" id="hRef"></div>
     <label class="f" for="sRRef">Refresco en la vista de línea (segundos)</label><input id="sRRef" type="number" min="1" max="600" step="1" inputmode="numeric" value="${esc(st.routeRefresh)}"><div class="hint" id="hRRef"></div>
+    <label class="f" for="sLRef">Refresco del mapa en vivo (segundos)</label><input id="sLRef" type="number" min="1" max="600" step="1" inputmode="numeric" value="${esc(st.liveRefresh || DEFAULTS.liveRefresh)}"><div class="hint" id="hLRef"></div>
     <label class="chk"><input id="sInterp" type="checkbox" ${st.interp ? "checked" : ""}> Mover los bondis entre consultas (interpolación)</label>
     <div class="small muted" style="margin:2px 2px 0">Estima la posición con la velocidad de los últimos fixes, sobre el recorrido, hasta 30 s. El bondi se ve más claro y con borde punteado cuando la posición es estimada.</div>
     <label class="chk"><input id="sModel" type="checkbox" ${st.useModel !== false ? "checked" : ""}> Usar lo aprendido con “Estoy en este bondi”</label>
@@ -1474,16 +1854,16 @@ function openSettings() {
     <div id="diag" aria-live="polite"></div>
     <div class="note small" style="margin-top:16px">Datos: servidor OneBusAway de Cuándo SUBO (SUBE / Nación Servicios). App personal, sin afiliación oficial. Mapa © OpenStreetMap; alternativa Esri (Powered by Esri).</div>`);
   $("#sMode").value = st.mode; renderTrainStats();
-  for (const [i, h] of [["sRef", "hRef"], ["sRRef", "hRRef"]]) { const upd = () => { $("#" + h).textContent = refreshHint($("#" + i).value); }; $("#" + i).addEventListener("input", upd); upd(); }
+  for (const [i, h] of [["sRef", "hRef"], ["sRRef", "hRRef"], ["sLRef", "hLRef"]]) { const upd = () => { $("#" + h).textContent = refreshHint($("#" + i).value); }; $("#" + i).addEventListener("input", upd); upd(); }
 }
 function saveSettings() {
   const st = S.settings;
   const num = (id, def) => { const v = Math.round(+$(id).value); return v >= 1 ? Math.min(600, v) : def; };
   st.base = $("#sBase").value.trim() || DEFAULTS.base; st.key = $("#sKey").value.trim() || DEFAULTS.key;
   st.mode = $("#sMode").value; st.proxy = $("#sProxy").value.trim(); st.grid = $("#sGrid").value.trim();
-  st.refresh = num("#sRef", DEFAULTS.refresh); st.routeRefresh = num("#sRRef", DEFAULTS.routeRefresh);
+  st.refresh = num("#sRef", DEFAULTS.refresh); st.routeRefresh = num("#sRRef", DEFAULTS.routeRefresh); st.liveRefresh = num("#sLRef", DEFAULTS.liveRefresh);
   st.interp = $("#sInterp").checked; st.useModel = $("#sModel").checked;
-  $("#sRef").value = st.refresh; $("#sRRef").value = st.routeRefresh;
+  $("#sRef").value = st.refresh; $("#sRRef").value = st.routeRefresh; $("#sLRef").value = st.liveRefresh;
   ls("settings", st); S.transport = null; for (const k in URL_OVERRIDES) delete URL_OVERRIDES[k];
   toast("Ajustes guardados");
 }
@@ -1507,7 +1887,8 @@ async function testConn() {
 
 /* ----------------------------- arranque -------------------------- */
 // Hook para pruebas (solo lectura del estado).
-window.__b2 = { S, P, Track, estimate, isStale, DEFAULTS, AUTH_SCHEME, authHeader, map, TR, TM, TRAIN, segAt, modelSpeed, lagMs, pointAt, project, trainStart, trainEnd, trainOnPhone, trainOnObaFix, trainStats };
+window.__b2 = { S, P, Track, trackFor, isTrainTarget, lineBase, lineKey, stopDir, stopDirText, centerVisible, visibleCenter, sheetPx, topInset, setSheet, showHostNote, loadLive,
+  get sheetState() { return sheetState; }, estimate, isStale, DEFAULTS, AUTH_SCHEME, authHeader, map, TR, TM, TRAIN, segAt, modelSpeed, lagMs, pointAt, project, trainStart, trainEnd, trainOnPhone, trainOnObaFix, trainStats };
 (async function boot() {
   // Sesión de entrenamiento que quedó abierta (recarga de la página): se retoma si tiene < 3 h.
   const ts = ls("trainSession");
@@ -1515,6 +1896,7 @@ window.__b2 = { S, P, Track, estimate, isStale, DEFAULTS, AUTH_SCHEME, authHeade
   else if (ts) localStorage.removeItem(NS + "trainSession");
   route();
   loadMapStops();
+  showHostNote();
   // GPS: solo si el usuario ya lo había activado y el permiso ya está dado (no aparece ningún cartel).
   if (ls("gps") && navigator.permissions && navigator.permissions.query) {
     try { const p = await navigator.permissions.query({ name: "geolocation" }); if (p.state === "granted") startGps(false); } catch (e) {}
@@ -1522,14 +1904,6 @@ window.__b2 = { S, P, Track, estimate, isStale, DEFAULTS, AUTH_SCHEME, authHeade
   loadAgencies().then(() => { if (S.view && S.view.type === "home") renderHome(); });
   const secure = location.protocol === "https:" || location.hostname === "localhost";
   if ("serviceWorker" in navigator && secure && !IN_APP) navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW:", e));
-  if (/github\.io$/i.test(location.hostname)) {
-    const n = document.getElementById("hostNote");
-    if (n) {
-      n.hidden = false;
-      n.innerHTML = "Hosteado en GitHub Pages (sin proxy de Daqui). Si no cargan los bondis, en Ajustes probá modo <b>JSONP</b>. Tochá para cerrar.";
-      n.onclick = () => { n.hidden = true; };
-    }
-  }
 })();
 </script>
 </body>

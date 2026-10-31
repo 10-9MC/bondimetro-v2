@@ -3,10 +3,25 @@
 Versión nueva del Bondímetro, en paralelo a la v1 (`/workspace/bondimetro/public/`, que **no se tocó**).
 Es de uso personal. Sigue siendo una PWA estática: un solo `index.html`, Leaflet local en `vendor/`, `sw.js` y el manifest.
 
+## Novedades 2.2.0
+
+- **Mapa en vivo (inicio).** Te centra y muestra **todos los bondis que están circulando** (de `vehicles-for-agency`), con chips por línea, un radio de 500 m y la lista "Más cercanos a vos".
+  - La lista da la distancia, el rumbo y si **viene hacia vos / se aleja / pasa de costado**.
+  - El "≈ N min" es una **estimación en línea recta** y así se rotula. No es el ETA del servidor; ese está en la vista de parada.
+  - Las paradas aparecen recién con zoom ≥ 16.
+- **Bondis con forma de bondi** apuntando a donde van, con el número de línea; el tooltip muestra el destino.
+- **Paradas con sentido.** Muestran una flechita y "sentido ← oeste". Usan el `direction` del servidor o lo infieren del recorrido (y lo aclaran). La "vereda probable" se deduce de la mano de circulación, porque el servidor no la informa.
+- **Líneas agrupadas por número.** "21" junta ida y vuelta; "50" junta 50A, 50B y 50C.
+  - La vista de línea muestra **todas las unidades** de todos esos routeIds. "Solo este sentido" es opcional.
+  - Cada unidad se identifica por su interno (`vehicleId`), así que dos bondis en el mismo viaje no se pisan.
+- **Hoja inferior** con 3 alturas (máximo 68%), botón "Bajar/Subir" siempre visible y gesto de deslizar. "Mi ubicación" centra en la parte visible del mapa.
+
+Capturas (390×844): `screenshots/v22-mapa-en-vivo.png`, `v22-linea-21.png`, `v22-linea-50.png`, `v22-parada-sentido.png`, `v22-mi-ubicacion.png`.
+
 ## Qué cambia respecto de la v1
 
 - **Bondis fluidos (interpolación).**
-  - Cada unidad tiene un marcador fijo identificado por `tripId`. Se mueve, no se borra y se vuelve a crear.
+  - Cada unidad tiene un marcador fijo identificado por su interno (`vehicleId`, o `tripId` si no viene). Se mueve, no se borra y se vuelve a crear.
   - Con cada posición GPS nueva, el marcador se desliza en unos 1 s. Si el salto pasa de 2 km, salta directo. Con `prefers-reduced-motion`, no hay animación.
 - **Estimación entre consultas.**
   - Con las dos últimas posiciones, se calcula la velocidad sobre la polilínea del recorrido, o en línea recta si no hay polilínea.
@@ -16,7 +31,7 @@ Es de uso personal. Sigue siendo una PWA estática: un solo `index.html`, Leafle
   - La distancia se muestra con "≈".
 - **Cuentas regresivas.** El ETA y "GPS hace X s" avanzan cada segundo, a partir de `predictedArrivalTime` y `lastLocationUpdateTime`. No se inventan horarios.
 - **Todos los bondis de una línea** (vista `#/route/<id>`):
-  - Muestra **todas** las unidades de `trips-for-route` a la vez. El sentido elegido va opaco y el otro, atenuado (tooltip "otro sentido").
+  - Muestra **todas** las unidades de todos los routeIds de la línea (`vehicles-for-agency`, o `trips-for-route` como plan B) a la vez. El sentido elegido va opaco y el otro, atenuado (tooltip "otro sentido").
   - Chips: "Todas las unidades (N)" (por defecto, y se recuerda), "Solo este sentido (M)" y "🔍 Encuadrar bondis".
   - Se actualiza por polling cada *Refresco línea* (15 s por defecto), con la misma interpolación.
   - Cómo se llega a esa vista:
@@ -38,7 +53,7 @@ Es de uso personal. Sigue siendo una PWA estática: un solo `index.html`, Leafle
   - Barra "Actualizado hace… · próximo en…" o "⚠️ Sin conexión · último dato hace…".
   - Si el dato es viejo, no dice "en vivo". También avisa si la hora del servidor está corrida más de 10 min.
   - Hay un link a la grilla oficial como plan B.
-- **Service worker** con caché propia (`bondimetro2-shell-3`):
+- **Service worker** con caché propia (`bondimetro2-shell-4`):
   - guarda solo el shell (`r.ok` y del mismo origen) y la red tiene prioridad;
   - la API y el proxy no pasan por la caché;
   - solo borra cachés con su prefijo, así que no pisa la de la v1.
@@ -109,11 +124,12 @@ Dentro de la app Android (UA `BondimetroApp`) usa el puente nativo `/oba`.
 ```bash
 cd /workspace/bondimetro-v2/test
 node server.js &     # mock en http://localhost:8766/bondimetro-v2/ (proxy y /api/where simulados)
-node test.js         # 48 pruebas en Chrome headless (19 de entrenamiento); todo DNS salvo localhost bloqueado
+node test.js         # 83 pruebas en Chrome headless; todo DNS salvo localhost bloqueado
+node shots.js        # capturas 390x844 con teselas reales de OSM
 ```
 
-- El mock tiene 5 unidades en 2 sentidos (una detenida), con `stops-for-route` y polilínea.
-- Modos: `/__mode?m=ok|401|down`. Registro de pedidos: `/__log`.
+- El mock tiene la línea 20 (5 unidades, una detenida), la 21 (ida y vuelta, 4 unidades, dos en el mismo viaje) y la 50 (50A/B/C), más una unidad estacionada y otra sin reportar hace 2 h.
+- Modos: `/__mode?m=ok|401|down|novfa`. Registro de pedidos: `/__log`.
 - Las capturas quedan en `screenshots/`.
 
 ## Riesgos (conocidos y aceptados: uso personal)
@@ -134,4 +150,9 @@ node test.js         # 48 pruebas en Chrome headless (19 de entrenamiento); todo
 - Un plan B más completo con la grilla, que muestre los horarios dentro de la app.
 - Pedir acceso formal a la API.
 - Entrenamiento: probarlo arriba de un bondi real (solo se probó con fixes simulados) y, más adelante, separar las velocidades por franja horaria.
-- Probarla contra el servidor real. No se hizo, para no gastar más llamadas a SUBE: se usaron solo las 2 de verificación.
+- Probarla a fondo contra el servidor real. Para la 2.2 solo se hicieron unas pocas lecturas (rutas, `vehicles-for-agency` y `trips-for-route` de la 21) para entender la forma de los datos.
+- Mapa en vivo:
+  - el "≈ min" es en línea recta y no sigue el recorrido;
+  - `vehicles-for-agency` pesa unos 68 KB por consulta;
+  - el feed llega con ~1 min de atraso.
+- Vereda de la parada: es una inferencia. Una parada sin `direction` en una calle doble mano queda "sin dato".

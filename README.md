@@ -1,6 +1,6 @@
 # Bondímetro v2 (GitHub Pages)
 
-Build estático de `/workspace/bondimetro-v2/public` (v2.1).
+Build estático de `/workspace/bondimetro-v2/public` (v2.2.0: mapa en vivo, todas las unidades por línea, sentido de paradas).
 
 URL: https://10-9MC.github.io/bondimetro-v2/
 
