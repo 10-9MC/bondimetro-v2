@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bondímetro v2</title>
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bondímetro 2">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<link rel="icon" href="icon-512.png" sizes="512x512">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+:root{
+  --bg:#ffffff;--fg:#111827;--mut:#6b7280;--line:#e5e7eb;--card:#f9fafb;
+  --acc:#0f766e;--acc2:#14b8a6;--live:#16a34a;--late:#dc2626;--early:#2563eb;--warn:#d97706;
+  --sheet-shadow:0 -6px 24px rgba(0,0,0,.18);
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#111418;--fg:#e5e7eb;--mut:#9ca3af;--line:#262b33;--card:#181c22;
+  --acc:#2dd4bf;--acc2:#14b8a6;--live:#4ade80;--late:#f87171;--early:#60a5fa;--warn:#fbbf24;
+  --sheet-shadow:0 -6px 24px rgba(0,0,0,.6);
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+  font:15px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input,select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+#map{position:fixed;inset:0;z-index:0;background:#d4dadc}
+@media (prefers-color-scheme:dark){#map{background:#1b1f24}}
+
+/* barra superior */
+#top{position:fixed;left:0;right:0;top:0;z-index:600;padding:calc(var(--st) + 10px) 10px 0;display:flex;gap:8px;pointer-events:none}
+#top>*{pointer-events:auto}
+#searchBox{flex:1;position:relative}
+#q{height:46px;border-radius:23px;padding:0 16px 0 42px;background:var(--bg);border:0;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+#searchBox svg{position:absolute;left:14px;top:13px;opacity:.55}
+.fab{width:46px;height:46px;border-radius:23px;background:var(--bg);box-shadow:0 2px 10px rgba(0,0,0,.2);display:grid;place-items:center;flex:none}
+.fab.on{color:var(--acc)}
+#results{position:absolute;top:52px;left:0;right:0;background:var(--bg);border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.25);max-height:55vh;overflow:auto;display:none}
+#results.show{display:block}
+#results .ri{display:flex;gap:10px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line)}
+#results .ri:last-child{border-bottom:0}
+
+/* hoja inferior */
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:700;background:var(--bg);border-radius:18px 18px 0 0;box-shadow:var(--sheet-shadow);
+  display:flex;flex-direction:column;transition:height .22s ease;height:42vh;padding-bottom:var(--sb)}
+#sheet.min{height:calc(96px + var(--sb))}
+#sheet.max{height:calc(100vh - var(--st) - 70px)}
+#grab{padding:8px 0 4px;display:grid;place-items:center;flex:none}
+#grab i{display:block;width:40px;height:5px;border-radius:3px;background:var(--line)}
+#head{padding:2px 16px 8px;flex:none;display:flex;align-items:center;gap:10px;min-height:40px}
+#head h2{margin:0;font-size:18px;font-weight:650;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#head .sub{font-size:12.5px;color:var(--mut);font-weight:400}
+#body{overflow:auto;flex:1;padding:0 12px 14px;-webkit-overflow-scrolling:touch}
+.iconbtn{width:36px;height:36px;border-radius:18px;display:grid;place-items:center;flex:none}
+.iconbtn:active{background:var(--card)}
+.star.on{color:#f59e0b}
+
+.sec{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:14px 4px 6px;font-weight:600}
+.item{display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .mid{flex:1;min-width:0}
+.item .t{font-weight:560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .s{font-size:12.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:26px;padding:0 7px;border-radius:7px;
+  font-weight:700;font-size:13.5px;color:#fff;background:#475569;flex:none;letter-spacing:-.01em}
+.badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.badges .badge{min-width:26px;height:20px;font-size:11.5px;padding:0 5px;border-radius:5px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:16px;background:var(--card);border:1px solid var(--line);font-size:13px;white-space:nowrap}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+@media (prefers-color-scheme:dark){.chip.on{color:#062a26}}
+.chips{display:flex;gap:6px;overflow:auto;padding:2px 2px 8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+
+.arr{display:flex;align-items:center;gap:10px;padding:11px 6px;border-bottom:1px solid var(--line)}
+.arr .mid{flex:1;min-width:0}
+.arr .hs{font-weight:560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arr .meta{font-size:12.5px;color:var(--mut);margin-top:1px}
+.arr .eta{text-align:right;flex:none;min-width:58px}
+.arr .eta b{font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.arr .eta small{display:block;font-size:11.5px;color:var(--mut);margin-top:-3px}
+.arr.sel,.rbus.sel{background:var(--card);border-radius:10px}
+.chip.train{background:#7c3aed;border-color:#7c3aed;color:#fff;font-weight:600}
+.trainrow{margin-top:6px}
+.selbus{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;margin:0 2px 8px;border:1px solid var(--line);border-radius:12px;background:var(--card);font-size:13px}
+#trainBar{display:none;position:fixed;left:10px;right:10px;top:calc(var(--st) + 62px);z-index:750;background:#4c1d95;color:#fff;border-radius:14px;padding:8px 10px;box-shadow:0 2px 10px rgba(0,0,0,.25);font-size:13px;align-items:center;gap:8px;flex-wrap:wrap}
+#trainBar.show{display:flex}
+#trainBar .tt{flex:1 1 160px;min-width:0}
+#trainBar button{color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:14px;padding:4px 10px;font-size:12.5px;background:transparent}
+.tstat{font-size:12.5px;line-height:1.5}
+.live{color:var(--live);font-weight:600}
+.dot{display:inline-block;width:7px;height:7px;border-radius:4px;background:var(--live);margin-right:4px;vertical-align:1px;}
+@media (prefers-reduced-motion:no-preference){.dot{animation:pulse 1.6s infinite}}
+@keyframes pulse{50%{opacity:.25}}
+.sched{color:var(--mut)}
+.late{color:var(--late)}.early{color:var(--early)}.stale{color:var(--warn)}
+.eta .sched-n{color:var(--mut)}
+
+.note{padding:12px;border-radius:12px;background:var(--card);border:1px solid var(--line);color:var(--mut);font-size:13.5px;margin:8px 0}
+.note.err{border-color:var(--late);color:var(--fg)}
+.note b{color:var(--fg)}
+.alert{padding:10px 12px;border-radius:12px;background:rgba(217,119,6,.12);border:1px solid var(--warn);font-size:13.5px;margin:6px 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:12px;background:var(--acc);color:#fff;font-weight:600}
+@media (prefers-color-scheme:dark){.btn{color:#062a26}}
+.btn.ghost{background:var(--card);color:var(--fg);border:1px solid var(--line)}
+.row{display:flex;gap:8px;align-items:center}
+.muted{color:var(--mut)}
+.small{font-size:12.5px}
+label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
+
+/* recorrido */
+.rstop{display:flex;gap:10px;align-items:stretch;min-height:40px}
+.rstop .rail{width:22px;flex:none;position:relative}
+.rstop .rail:before{content:"";position:absolute;left:10px;top:0;bottom:0;width:3px;background:var(--rc,#64748b);opacity:.55}
+.rstop .rail i{position:absolute;left:5px;top:13px;width:13px;height:13px;border-radius:7px;background:var(--bg);border:3px solid var(--rc,#64748b)}
+.rstop.first .rail:before{top:16px}.rstop.last .rail:before{bottom:calc(100% - 16px)}
+.rstop .nm{padding:10px 0;flex:1;border-bottom:1px solid var(--line);min-width:0}
+.rbus{display:flex;gap:10px;align-items:center;min-height:34px}
+.rbus .rail{width:22px;flex:none;position:relative;align-self:stretch}
+.rbus .rail:before{content:"";position:absolute;left:10px;top:0;bottom:0;width:3px;background:var(--rc,#64748b);opacity:.55}
+.rbus .bus{position:absolute;left:-1px;top:50%;transform:translateY(-50%);width:25px;height:25px;border-radius:13px;background:var(--rc,#475569);display:grid;place-items:center;color:#fff;box-shadow:0 0 0 3px var(--bg)}
+.rbus .txt{font-size:12.5px;color:var(--fg);padding:6px 0}
+
+/* marcadores */
+.busmk{width:30px;height:30px;position:relative}
+.busmk .c{position:absolute;inset:3px;border-radius:12px;background:var(--mc,#0f766e);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 10px/1 sans-serif}
+.busmk .a{position:absolute;inset:0;transform-origin:50% 50%}
+.busmk .a:before{content:"";position:absolute;left:50%;top:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:7px solid var(--mc,#0f766e)}
+.busmk.old .c{opacity:.55}
+.memk{width:18px;height:18px;border-radius:9px;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25)}
+.leaflet-control-attribution{font-size:10px!important}
+.darktiles{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.6)}
+.leaflet-bottom{bottom:calc(42vh)}
+.hidden{display:none!important}
+#toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--st) + 66px);z-index:900;background:#111827;color:#fff;padding:9px 14px;border-radius:12px;font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+#toast.show{opacity:.95}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;vertical-align:-2px;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.upd{font-size:11.5px;color:var(--mut);text-align:center;margin:10px 0 2px}
+
+/* ---- v2 ---- */
+.busmk{transition:opacity .3s}
+.busmk.est .c{opacity:.62;border-style:dashed}
+.busmk.est .a{opacity:.5}
+.busmk.stop .a{display:none}
+.stalebar{padding:8px 12px;border-radius:12px;background:rgba(217,119,6,.12);border:1px solid var(--warn);font-size:13px;margin:6px 0}
+.hint{font-size:12px;color:var(--warn);margin:4px 2px 0;min-height:1em}
+.ver{font-size:11px;font-weight:700;background:var(--acc);color:#fff;border-radius:6px;padding:1px 5px;vertical-align:2px;margin-left:4px}
+@media (prefers-color-scheme:dark){.ver{color:#062a26}}
+.gridlink{display:inline-block;margin-top:6px}
+.chk{display:flex;gap:8px;align-items:center;margin:12px 2px 0;font-size:14px}
+.chk input{width:auto}
+[role="button"]{cursor:pointer}
+[role="button"]:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+@media (prefers-reduced-motion:reduce){
+  .dot,.spin{animation:none}
+  #sheet,#toast,.busmk{transition:none}
+}
+</style>
+</head>
+<body>
+<div id="map" role="application" aria-label="Mapa"></div>
+
+<div id="top">
+  <div id="searchBox">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Línea o código de parada" aria-label="Buscar línea o parada" autocomplete="off" enterkeyhint="search">
+    <div id="results" role="listbox" aria-label="Resultados"></div>
+  </div>
+  <button class="fab" id="btnLoc" title="Mi ubicación" aria-label="Mi ubicación">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+  </button>
+  <button class="fab" id="btnMenu" title="Ciudades y ajustes" aria-label="Menú">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+</div>
+
+<div id="sheet">
+  <div id="grab" role="button" tabindex="0" aria-label="Agrandar o achicar el panel"><i></i></div>
+  <div id="head"></div>
+  <div id="body"></div>
+</div>
+<div id="trainBar" role="status" aria-live="polite"><span class="tt"></span><button data-act="trainView">Ver</button><button data-act="trainEnd">Terminar</button><button data-act="trainDiscard" aria-label="Cancelar y descartar la sesión">Cancelar</button></div>
+<div id="hostNote" style="position:fixed;left:8px;right:8px;bottom:8px;z-index:9998;background:#1a2332;color:#cde;font:12px/1.35 system-ui,sans-serif;padding:8px 10px;border-radius:10px;box-shadow:0 4px 16px #0006" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="vendor/leaflet.js"></script>
+<script>
+"use strict";
+/* ================================================================
+   Bondímetro v2 — cliente OneBusAway para el backend de Cuándo SUBO
+   Cambios vs v1: ver README.md / CHANGELOG.md.
+   ================================================================ */
+const APP_VER = "2.1.0";
+const NS = "bondi2.";   // prefijo de localStorage (v1 usa "bondi." en el mismo origen: no pisarlo)
+
+const DEFAULTS = {
+  base: "https://cuandosubo.sube.gob.ar/onebusaway-api-webapp/api/where",
+  key: "CuandoSUBO-Android-9b8a8543-b111-4caf-80b0-b70913425a0c",
+  mode: "auto",                 // auto | fetch | proxy | jsonp
+  proxy: "",                   // en GitHub Pages no hay proxy Daqui; auto usa fetch→JSONP
+  refresh: 20,                  // s entre consultas en la vista de parada (configurable, sin mínimo duro)
+  routeRefresh: 15,             // s entre consultas en la vista de línea (configurable)
+  interp: true,                 // mover los bondis entre consultas (extrapolación)
+  useModel: true,               // usar lo aprendido con "Estoy en este bondi" (velocidad por tramo + desfase del feed)
+  grid: "/bondi/"               // web con la grilla oficial de Mi Bus (sin datos en vivo)
+};
+// Autenticación: UN solo formato. Verificado el 30/10/2026 con 2 pedidos reales
+// (current-time y agencies-with-coverage → HTTP 200, code 200):
+//   Authorization: apiKey <clave>   (+ ?key=<clave> en la URL, como OneBusAway estándar)
+const AUTH_SCHEME = "apiKey";
+const FALLBACK_CENTER = [-41.1335, -71.3103]; // Centro Cívico, Bariloche
+const EXTRAP_MAX_S = 30;      // tope de extrapolación desde el último fix GPS
+const ANIM_MS = 1000;         // animación al llegar un fix nuevo
+const MAX_SPEED = 22;         // m/s (~80 km/h): tope para la extrapolación
+const REDUCE_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const CITIES = [
+ ["AMBA",-34.6037,-58.3816],["La Plata",-34.9214,-57.9544],["Bariloche",-41.1335,-71.3103],["Neuquén",-38.9516,-68.0591],
+ ["Cipolletti",-38.9339,-67.9903],["General Roca",-39.0333,-67.5833],["Viedma",-40.8135,-62.9967],["Mendoza",-32.8895,-68.8458],
+ ["San Juan",-31.5375,-68.5364],["San Luis",-33.3017,-66.3378],["Córdoba",-31.4201,-64.1888],["Río Cuarto",-33.1232,-64.3493],
+ ["Villa María",-32.4075,-63.2402],["Rosario",-32.9442,-60.6505],["Santa Fe",-31.6333,-60.7000],["Paraná",-31.7319,-60.5238],
+ ["Tucumán",-26.8083,-65.2176],["Salta",-24.7821,-65.4232],["Jujuy",-24.1858,-65.2995],["Catamarca",-28.4696,-65.7852],
+ ["La Rioja",-29.4131,-66.8558],["Santiago del Estero",-27.7951,-64.2615],["Resistencia",-27.4514,-58.9867],["Corrientes",-27.4692,-58.8306],
+ ["Posadas",-27.3671,-55.8961],["Formosa",-26.1775,-58.1781],["Mar del Plata",-38.0055,-57.5426],["Bahía Blanca",-38.7196,-62.2724],
+ ["Tandil",-37.3217,-59.1332],["Olavarría",-36.8927,-60.3225],["Junín",-34.5850,-60.9589],["Pergamino",-33.8895,-60.5736],
+ ["San Nicolás",-33.3342,-60.2108],["Zárate",-34.0981,-59.0286],["Luján",-34.5703,-59.1050],["Santa Rosa",-36.6167,-64.2833],
+ ["Comodoro Rivadavia",-45.8641,-67.4966],["Trelew",-43.2489,-65.3051],["Puerto Madryn",-42.7692,-65.0385],["Rawson",-43.3002,-65.1023],
+ ["Esquel",-42.9110,-71.3195],["Río Gallegos",-51.6230,-69.2168],["Ushuaia",-54.8019,-68.3030],["Río Grande",-53.7877,-67.7095],
+ ["San Martín de los Andes",-40.1579,-71.3534],["Concordia",-31.3929,-58.0209],["Gualeguaychú",-33.0094,-58.5172],["Campana",-34.1633,-58.9592]
+];
+
+/* ---------------------------- estado ---------------------------- */
+function ls(k, v) {
+  try { if (v === undefined) return JSON.parse(localStorage.getItem(NS + k)); localStorage.setItem(NS + k, JSON.stringify(v)); }
+  catch (e) { return null; }
+}
+// Primera vez: traer favoritos y la vista de v1 (solo lectura de sus claves).
+(function migrateFromV1() {
+  if (ls("migrated")) return;
+  try {
+    const f = JSON.parse(localStorage.getItem("bondi.favs") || "null"); if (f) ls("favs", f);
+    const v = JSON.parse(localStorage.getItem("bondi.view") || "null"); if (v) ls("view", v);
+  } catch (e) {}
+  ls("migrated", true);
+})();
+
+const URL_OVERRIDES = {};
+function loadSettings() {
+  const st = Object.assign({}, DEFAULTS, ls("settings") || {});
+  delete st.auth;
+  // Overrides por URL (pruebas/dev): ?api=...&key=...&mode=...&proxy=...  Se usan en esta sesión
+  // y NO se guardan, salvo que toques "Guardar" en Ajustes. Ver riesgo en README.
+  const p = new URLSearchParams(location.search);
+  for (const [q, k] of [["api", "base"], ["key", "key"], ["mode", "mode"], ["proxy", "proxy"]]) if (p.get(q)) { st[k] = p.get(q); URL_OVERRIDES[k] = st[k]; }
+  return st;
+}
+const S = {
+  settings: loadSettings(),
+  transport: null,
+  skew: 0, clockBad: false,
+  here: null, watchId: null, gpsWanted: false,
+  agencies: [], agencyName: {}, routes: {}, routesByAgency: {}, stopsCache: {},
+  routePolys: {}, polyLoading: new Set(),
+  stopFilter: null, selTrip: null, view: null,
+  arrivals: [], situations: [], routeData: null, routeDir: 0, vehicles: [],
+  lastOk: 0, connErr: null,
+  favs: Object.assign({ stops: [], routes: [] }, ls("favs") || {})
+};
+S.transport = (ls("transport") || {})[S.settings.base] || null;
+function saveFavs() { ls("favs", S.favs); }
+
+/* ------------------------- utilidades ---------------------------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const now = () => Date.now() + S.skew;
+const r3 = x => (+x).toFixed(3);   // ~100 m: precisión de la ubicación que mandamos al servidor
+function toast(msg, ms = 2600) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), ms); }
+function dist(a, b) {
+  const R = 6371000, r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r;
+  const x = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function fmtDist(m) { return m < 1000 ? Math.max(0, Math.round(m / 10) * 10) + " m" : (m / 1000).toFixed(1).replace(".", ",") + " km"; }
+function fmtAgo(ms) { const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + " s"; const m = Math.round(s / 60); return m < 60 ? m + " min" : Math.round(m / 60) + " h"; }
+function hhmm(t) { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+function hashColor(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) | 0; return `hsl(${Math.abs(h) % 360} 62% 38%)`; }
+function routeColor(r) { const c = r && r.color && /^[0-9a-f]{6}$/i.test(r.color) && r.color.toLowerCase() !== "ffffff" ? "#" + r.color : null; return c || hashColor(r ? (r.shortName || r.id) : "?"); }
+function routeText(r) { return r && r.textColor && /^[0-9a-f]{6}$/i.test(r.textColor) && r.color ? "#" + r.textColor : "#fff"; }
+function routeLabel(r) { return r ? (r.shortName || r.longName || String(r.id).split("_").pop()) : "?"; }
+function routeOf(id, short) { return S.routes[id] || { id, shortName: short }; }
+function badge(r) { return `<span class="badge" style="background:${routeColor(r)};color:${routeText(r)}">${esc(routeLabel(r))}</span>`; }
+function decodePoly(str) {
+  let i = 0, lat = 0, lng = 0; const out = [];
+  while (i < str.length) {
+    let b, s = 0, r = 0;
+    do { b = str.charCodeAt(i++) - 63; r |= (b & 31) << s; s += 5; } while (b >= 32);
+    lat += (r & 1) ? ~(r >> 1) : (r >> 1);
+    s = 0; r = 0;
+    do { b = str.charCodeAt(i++) - 63; r |= (b & 31) << s; s += 5; } while (b >= 32);
+    lng += (r & 1) ? ~(r >> 1) : (r >> 1);
+    out.push([lat / 1e5, lng / 1e5]);
+  }
+  return out;
+}
+function cityName(lat, lon) {
+  let best = null, bd = 1e12;
+  for (const c of CITIES) { const d = dist([lat, lon], [c[1], c[2]]); if (d < bd) { bd = d; best = c[0]; } }
+  return bd < 45000 ? best : null;
+}
+const backSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`;
+const starSvg = on => `<svg width="22" height="22" viewBox="0 0 24 24" fill="${on ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.4 6.5 20.3l1-6.2L3 9.7l6.2-.9z"/></svg>`;
+function gridLink(txt = "Ver horarios oficiales (grilla Mi Bus, no es en vivo)") {
+  return S.settings.grid ? `<a class="gridlink" href="${esc(S.settings.grid)}" target="_blank" rel="noopener">📅 ${esc(txt)}</a>` : "";
+}
+
+/* ------------------- transporte hacia la API --------------------- */
+class ApiError extends Error { constructor(code, text) { super(text || ("Error " + code)); this.code = code; } }
+const abortError = () => new DOMException("abortado", "AbortError");
+let jsonpSeq = 0;
+// JSONP: se mantiene (pedido de Nano). Ejecuta el script que devuelva el servidor configurado.
+function jsonp(url, ms = 12000, signal) {
+  return new Promise((res, rej) => {
+    const cb = "__oba" + (++jsonpSeq);
+    const s = document.createElement("script");
+    const t = setTimeout(() => { clean(); rej(new Error("tiempo agotado (JSONP)")); }, ms);
+    const onAbort = () => { clean(); rej(abortError()); };
+    function clean() { clearTimeout(t); window[cb] = () => {}; s.remove(); if (signal) signal.removeEventListener("abort", onAbort); }
+    if (signal) { if (signal.aborted) return onAbort(); signal.addEventListener("abort", onAbort, { once: true }); }
+    window[cb] = d => { clean(); delete window[cb]; res(d); };
+    s.onerror = () => { clean(); rej(new Error("JSONP rechazado")); };
+    s.src = url + (url.includes("?") ? "&" : "?") + "callback=" + cb;
+    document.head.appendChild(s);
+  });
+}
+async function fetchJson(url, { ms = 12000, headers = null, signal = null } = {}) {
+  const c = new AbortController(); let timedOut = false;
+  const t = setTimeout(() => { timedOut = true; c.abort(); }, ms);
+  const onAbort = () => c.abort();
+  if (signal) { if (signal.aborted) { clearTimeout(t); throw abortError(); } signal.addEventListener("abort", onAbort, { once: true }); }
+  try {
+    const r = await fetch(url, { signal: c.signal, cache: "no-store", headers: headers || undefined });
+    const txt = await r.text();
+    let body;
+    try { body = JSON.parse(txt); }
+    catch (e) { throw new ApiError(r.status || -1, `HTTP ${r.status}: ${txt.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160) || "respuesta vacía"}`); }
+    if (!r.ok && (!body || !body.code || body.code === 200)) throw new ApiError(r.status, (body && body.text) || "HTTP " + r.status);
+    return body;
+  } catch (e) {
+    if (signal && signal.aborted) throw abortError();
+    if (timedOut) throw new Error("tiempo agotado");
+    throw e;
+  } finally { clearTimeout(t); if (signal) signal.removeEventListener("abort", onAbort); }
+}
+function buildUrl(base, path, params) {
+  const q = new URLSearchParams(Object.assign({ key: S.settings.key }, params));
+  return String(base).replace(/\/+$/, "") + "/" + path + ".json?" + q.toString();
+}
+function authHeader() { return S.settings.key ? AUTH_SCHEME + " " + S.settings.key : ""; }
+const IN_APP = /BondimetroApp/.test(navigator.userAgent);
+//  - nativo: la app Android pone la cabecera (puente /oba?h=)
+//  - proxy:  el proxy la reenvía (?h=), igual que v1 para no romper el nginx actual
+//  - fetch:  el navegador la pone (solo con CORS/mismo origen)
+//  - jsonp:  sin cabeceras; último recurso
+function rawCall(path, params, kind, signal) {
+  const st = S.settings, auth = authHeader();
+  const url = buildUrl(st.base, path, params);
+  if (kind === "nativo") return fetchJson("/oba?" + (auth ? "h=" + encodeURIComponent(auth) + "&" : "") + "u=" + encodeURIComponent(url), { ms: 15000, signal });
+  if (kind === "proxy") return fetchJson(buildUrl(st.proxy, path, params) + (auth ? "&h=" + encodeURIComponent(auth) : ""), { signal });
+  if (kind === "jsonp") return jsonp(url, 12000, signal);
+  return fetchJson(url, { headers: auth ? { Authorization: auth } : null, signal });
+}
+function transportsFor(st) {
+  if (IN_APP) return ["nativo"];
+  if (st.mode === "fetch") return ["fetch"];
+  if (st.mode === "jsonp") return ["jsonp"];
+  if (st.mode === "proxy") return st.proxy ? ["proxy"] : [];
+  const all = ["fetch"]; if (st.proxy) all.push("proxy"); all.push("jsonp");
+  if (S.transport && all.includes(S.transport)) all.sort((a, b) => (b === S.transport) - (a === S.transport));
+  return all;
+}
+function noteServerTime(ct) {
+  if (!Number.isFinite(ct) || ct <= 0) return;
+  const d = ct - Date.now();
+  if (Math.abs(d) > 10 * 60000) { S.clockBad = true; return; }   // dato viejo (caché) o reloj roto: no confiar
+  S.clockBad = false; S.skew = d;
+}
+async function api(path, params = {}, signal = null) {
+  const st = S.settings, kinds = transportsFor(st);
+  if (!kinds.length) throw new ApiError(0, "Modo proxy sin URL de proxy configurada");
+  let lastErr;
+  for (const kind of kinds) {
+    try {
+      const body = await rawCall(path, params, kind, signal);
+      if (!body) throw new ApiError(0, "Respuesta vacía");
+      if (body.code && body.code !== 200) throw new ApiError(body.code, body.text);
+      if (S.transport !== kind) { S.transport = kind; if (!IN_APP && !URL_OVERRIDES.base) { const m = ls("transport") || {}; m[st.base] = kind; ls("transport", m); } }
+      noteServerTime(body.currentTime);
+      return body;
+    } catch (e) {
+      if (e.name === "AbortError") throw e;
+      lastErr = e;
+      if (e instanceof ApiError && e.code) throw e;   // el servidor contestó: otro transporte no lo cambia
+    }
+  }
+  throw lastErr || new Error("Sin conexión");
+}
+function errMsg(e) {
+  if (e instanceof ApiError) {
+    if (e.code === 401 || e.code === 403) return `El servidor rechazó la clave (código ${e.code}). Frené la actualización para no insistir. Revisá la clave en <a href="#/settings">Ajustes</a> y tocá Reintentar.`;
+    if (e.code === 404) return "El servidor no conoce ese elemento (404).";
+    if (e.code === 502) return "No se pudo llegar al servidor: " + esc(e.message);
+    return esc(e.message) + (e.code ? ` (código ${e.code})` : "");
+  }
+  return "No pude hablar con el servidor (" + esc(e.message || e) + "). En la web puede ser CORS: probá el modo proxy en Ajustes.";
+}
+function indexRefs(refs) {
+  if (!refs) return;
+  for (const r of refs.routes || []) S.routes[r.id] = Object.assign(S.routes[r.id] || {}, r);
+  for (const s of refs.stops || []) S.stopsCache[s.id] = s;
+  for (const a of refs.agencies || []) S.agencyName[a.id] = a.name;
+}
+
+/* ------------------------- polling ------------------------------- */
+// Un solo ciclo de consultas por vista, con setTimeout (no setInterval):
+//  - el intervalo lo define el usuario (Ajustes) y se respeta tal cual al andar bien (±5% jitter);
+//  - con errores: backoff exponencial hasta 2 min con jitter ±20%;
+//  - con 401/403: se frena y se muestra el error (sin probar otras claves);
+//  - pestaña oculta: se aborta el pedido y se pausa; al volver, consulta enseguida;
+//  - al cambiar de vista: AbortController cancela el pedido en curso.
+const P = { fn: null, timer: null, ctl: null, base: 20000, errs: 0, next: 0, stopped: null, count: 0 };
+function startPoll(fn, sec) {
+  stopPoll();
+  P.fn = fn; P.base = Math.max(1, +sec || 20) * 1000; P.errs = 0; P.stopped = null;
+  S.lastOk = 0; S.connErr = null;
+  runPoll();
+}
+function stopPoll() { clearTimeout(P.timer); P.timer = null; if (P.ctl) P.ctl.abort(); P.ctl = null; P.fn = null; P.next = 0; }
+function schedule(ms) { clearTimeout(P.timer); P.next = Date.now() + ms; P.timer = setTimeout(runPoll, ms); }
+async function runPoll() {
+  const fn = P.fn; if (!fn) return;
+  clearTimeout(P.timer); P.timer = null;
+  if (document.hidden) { P.next = 0; return; }
+  if (P.ctl) P.ctl.abort();
+  const ctl = P.ctl = new AbortController();
+  let delay;
+  try {
+    P.count++;
+    await fn(ctl.signal);
+    if (P.fn !== fn) return;
+    P.errs = 0; S.lastOk = Date.now(); S.connErr = null;
+    delay = P.base * (0.95 + Math.random() * 0.1);
+  } catch (e) {
+    if (e.name === "AbortError" || P.fn !== fn) return;
+    S.connErr = e;
+    if (e instanceof ApiError && (e.code === 401 || e.code === 403)) { P.stopped = e; P.next = 0; showPollError(); return; }
+    P.errs++;
+    delay = Math.min(120000, Math.max(P.base, 5000) * 2 ** P.errs) * (0.8 + Math.random() * 0.4);
+    showPollError();
+  } finally { if (P.ctl === ctl) P.ctl = null; }
+  schedule(delay);
+}
+function isStale() { return !!S.connErr || S.clockBad || !S.lastOk || Date.now() - S.lastOk > Math.max(3 * P.base, 90000); }
+function showPollError() {
+  const v = S.view; if (!v) return;
+  if (v.type === "stop") { if (v.loaded) renderArrivals(); else body(errBox()); }
+  if (v.type === "route" && S.routeData) { renderRouteList(); drawVehicles(); }
+  updateStaleMarkers();
+}
+function errBox() {
+  if (!S.connErr) return S.clockBad ? `<div class="stalebar">⚠️ La hora del servidor no coincide con la del teléfono (más de 10 min): tomo los datos como viejos.</div>` : "";
+  return `<div class="note err" id="pollErr">${errMsg(S.connErr)}${P.stopped ? `<div class="row" style="margin-top:8px"><button class="btn ghost" data-act="retry">Reintentar</button></div>` : ""}<div>${gridLink()}</div></div>`;
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { clearTimeout(P.timer); P.timer = null; P.next = 0; if (P.ctl) P.ctl.abort(); pauseGps(); }
+  else { if (P.fn && !P.stopped) runPoll(); resumeGps(); kickAnim(); }
+});
+
+/* ----------------------------- mapa ------------------------------ */
+const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+const lastView = ls("view");
+const map = L.map("map", { zoomControl: false, attributionControl: true })
+  .setView(lastView ? lastView.c : FALLBACK_CENTER, lastView ? lastView.z : 15);
+const TILES = [
+  ["https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }],
+  ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Powered by Esri · Mapa &copy; Esri, HERE, Garmin, &copy; OpenStreetMap" }]
+];
+let tileIdx = 0, tileErr = 0, tiles = null;
+function setTiles(i) {
+  if (tiles) map.removeLayer(tiles);
+  tileIdx = i; tileErr = 0;
+  tiles = L.tileLayer(TILES[i][0], Object.assign({ className: dark ? "darktiles" : "" }, TILES[i][1])).addTo(map);
+  tiles.on("tileerror", () => { if (++tileErr >= 6 && tileIdx < TILES.length - 1) setTiles(tileIdx + 1); });
+  tiles.on("tileload", () => { tileErr = 0; });
+}
+setTiles(0);
+map.createPane("selPane").style.zIndex = 450;
+const stopLayer = L.layerGroup().addTo(map);
+const routeLayer = L.layerGroup().addTo(map);
+const busLayer = L.layerGroup().addTo(map);
+let meMarker = null, selStopMarker = null;
+function sheetPad() { const h = $("#sheet").getBoundingClientRect().height; return { paddingTopLeft: [30, 80], paddingBottomRight: [30, h + 20] }; }
+// OBA informa la orientación en grados con 0 = Este, sentido antihorario: rotación CSS = 90 − orientación.
+function busIcon(r, bearing, old, label) {
+  const col = routeColor(r);
+  const rot = Number.isFinite(bearing) ? `<div class="a" style="transform:rotate(${90 - bearing}deg)"></div>` : "";
+  return L.divIcon({ className: "", iconSize: [30, 30], iconAnchor: [15, 15],
+    html: `<div class="busmk${old ? " old" : ""}" style="--mc:${col}">${rot}<div class="c">${esc((label || routeLabel(r)).slice(0, 4))}</div></div>` });
+}
+
+/* ----------------- geometría para la interpolación --------------- */
+// Coordenadas locales en metros (equirectangular): sobra para distancias de pocos km.
+// Ángulos en "estilo OBA": grados desde el Este, antihorario (atan2(norte, este)).
+function toXY(p, lat0) { return [p[1] * 111320 * Math.cos(lat0 * Math.PI / 180), p[0] * 110540]; }
+function fromXY(x, y, lat0) { return [y / 110540, x / (111320 * Math.cos(lat0 * Math.PI / 180))]; }
+function prepPoly(pts) {
+  if (!pts || pts.length < 2) return null;
+  const lat0 = pts[0][0], xy = pts.map(p => toXY(p, lat0)), cum = [0];
+  for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+  return { lat0, xy, cum, len: cum[cum.length - 1] };
+}
+function project(poly, p) { // → { along, off } (metros sobre la polilínea, distancia perpendicular)
+  const q = toXY(p, poly.lat0); let best = { along: 0, off: Infinity };
+  for (let i = 1; i < poly.xy.length; i++) {
+    const a = poly.xy[i - 1], b = poly.xy[i], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+    const k = L2 ? Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2)) : 0;
+    const off = Math.hypot(q[0] - (a[0] + k * dx), q[1] - (a[1] + k * dy));
+    if (off < best.off) best = { along: poly.cum[i - 1] + k * Math.sqrt(L2), off };
+  }
+  return best;
+}
+function pointAt(poly, along) {
+  along = Math.max(0, Math.min(poly.len, along));
+  let i = 1; while (i < poly.cum.length - 1 && poly.cum[i] < along) i++;
+  const seg = poly.cum[i] - poly.cum[i - 1], k = seg ? (along - poly.cum[i - 1]) / seg : 0;
+  const a = poly.xy[i - 1], b = poly.xy[i];
+  return { p: fromXY(a[0] + k * (b[0] - a[0]), a[1] + k * (b[1] - a[1]), poly.lat0), hd: Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI };
+}
+
+/* ----------- seguimiento de unidades (marcadores reusados) -------- */
+// Track: tripId → { fixes, vel, marker, shown, anim, meta, iconKey, last }
+// El mismo motor sirve para la vista de parada y para la vista de línea (todas las unidades).
+const Track = new Map();
+function clearTracks() { for (const tr of Track.values()) busLayer.removeLayer(tr.marker); Track.clear(); }
+function addFix(tr, lat, lon, t) {
+  const last = tr.fixes[tr.fixes.length - 1];
+  if (last && t < last.t) return false;
+  if (last && last.t === t && last.lat === lat && last.lon === lon) return false;
+  tr.fixes.push({ lat, lon, t }); if (tr.fixes.length > 3) tr.fixes.shift();
+  computeVel(tr); return true;
+}
+// Polilínea de la línea más cercana a p (<60 m). Con `prev`, prefiere la que se recorre hacia adelante
+// (ida y vuelta suelen compartir calles: así se elige el sentido correcto y sus paradas).
+function findPoly(routeId, p, prev) {
+  let best = null;
+  for (const poly of S.routePolys[routeId] || []) {
+    const pr = project(poly, p); if (pr.off >= 60) continue;
+    let fwd = 0; if (prev) { const pa = project(poly, prev); fwd = pa.off < 60 && pr.along - pa.along > 3 ? 1 : 0; }
+    const score = pr.off - fwd * 1000;
+    if (!best || score < best.score) best = { poly, pr, score };
+  }
+  return best;
+}
+function computeVel(tr) {
+  tr.vel = null;
+  const n = tr.fixes.length; if (n < 2) return;
+  const a = tr.fixes[n - 2], b = tr.fixes[n - 1], dt = (b.t - a.t) / 1000;
+  if (dt < 2 || dt > 240) return;
+  const pa = [a.lat, a.lon], pb = [b.lat, b.lon], d = dist(pa, pb);
+  if (d < 8) { tr.vel = { speed: 0 }; return; }            // detenido: no mover
+  if (d / dt > 30) return;                                   // salto de GPS: no extrapolar
+  const fb = findPoly(tr.meta.routeId, pb, pa);
+  if (fb) {
+    const pra = project(fb.poly, pa), dAl = fb.pr.along - pra.along;
+    if (pra.off < 60 && Math.abs(dAl) > 5) { tr.vel = { speed: Math.min(MAX_SPEED, Math.abs(dAl) / dt), poly: fb.poly, along: fb.pr.along, sign: Math.sign(dAl) }; return; }
+  }
+  const A = toXY(pa, a.lat), B = toXY(pb, a.lat);
+  tr.vel = { speed: Math.min(MAX_SPEED, d / dt), ux: (B[0] - A[0]) / d, uy: (B[1] - A[1]) / d, hd: Math.atan2(B[1] - A[1], B[0] - A[0]) * 180 / Math.PI };
+}
+// Dónde estaría ahora: último fix + velocidad × tiempo desde el fix (tope 30 s, sin pasar la parada).
+function estimate(tr, T) {
+  const f = tr.fixes[tr.fixes.length - 1], base = { p: [f.lat, f.lon], est: false, moved: 0, hd: null };
+  const v = tr.vel;
+  if (!S.settings.interp || !v || !(v.speed > 0) || isStale()) return base;
+  // Modelo aprendido (solo si no es el bondi que se está entrenando ahora: ese se mide "en crudo").
+  const useM = S.settings.useModel !== false && !(TR.session && TR.session.tripId === tr.meta.id);
+  const lag = useM ? lagMs() : 0;                 // el feed fecha el fix ~lag ms más tarde de lo real
+  const dt = Math.min(EXTRAP_MAX_S, Math.max(0, (T - f.t + lag) / 1000));
+  if (dt < 1) return base;
+  let d = v.speed * dt, src = "fix";
+  if (useM && v.poly && v.sign > 0) { const m = modelAdvance(v.poly, v.along, v.speed, dt); if (m.used) { d = m.d; src = "model"; } }
+  if (Number.isFinite(tr.meta.maxAhead)) d = Math.min(d, Math.max(0, tr.meta.maxAhead));
+  if (d < 1) return base;
+  if (v.poly) { const q = pointAt(v.poly, v.along + d * v.sign); return { p: q.p, est: true, moved: d, hd: v.sign > 0 ? q.hd : q.hd + 180, src }; }
+  const o = toXY([f.lat, f.lon], f.lat);
+  return { p: fromXY(o[0] + v.ux * d, o[1] + v.uy * d, f.lat), est: true, moved: d, hd: v.hd, src };
+}
+// items: [{ id, routeId, lat, lon, t, bearing, old, faded, z, tip, label, maxAhead }]
+function syncBuses(items) {
+  const seen = new Set();
+  for (const it of items) {
+    seen.add(it.id);
+    let tr = Track.get(it.id), isNew = false;
+    if (!tr) { tr = { fixes: [], vel: null, marker: null, shown: null, anim: null, meta: it, iconKey: "" }; Track.set(it.id, tr); isNew = true; }
+    tr.meta = it;
+    const fresh = addFix(tr, it.lat, it.lon, it.t);
+    if (fresh && TR.session && it.id === TR.session.tripId) trainOnObaFix(it);
+    const e = estimate(tr, now());
+    const r = routeOf(it.routeId);
+    const bearing = Number.isFinite(it.bearing) ? it.bearing : (e.hd != null ? e.hd : (tr.vel && tr.vel.hd != null ? tr.vel.hd : NaN));
+    const key = [routeColor(r), Math.round(bearing / 5), !!it.old, it.label].join("|");
+    if (isNew) {
+      tr.marker = L.marker(e.p, { icon: busIcon(r, bearing, it.old, it.label), zIndexOffset: it.z || 500, opacity: it.faded ? .5 : 1, keyboard: false });
+      tr.marker.on("click", () => ACTIONS.bus(it.id));
+      tr.marker.bindTooltip("", { direction: "top", offset: [0, -14] });
+      busLayer.addLayer(tr.marker); tr.shown = e.p; tr.iconKey = key;
+    } else {
+      if (key !== tr.iconKey) { tr.marker.setIcon(busIcon(r, bearing, it.old, it.label)); tr.iconKey = key; tr.estShown = null; }
+      tr.marker.setZIndexOffset(it.z || 500); tr.marker.setOpacity(it.faded ? .5 : 1);
+      if (fresh) {
+        const far = dist(tr.shown, e.p) > 2000;
+        if (REDUCE_MOTION || far) { tr.anim = null; tr.marker.setLatLng(e.p); tr.shown = e.p; }
+        else tr.anim = { from: tr.shown, t0: performance.now() };
+      }
+    }
+    tr.marker.setTooltipContent(it.tip);
+    tr.marker._b2faded = !!it.faded;
+    tr.last = e;
+  }
+  for (const [id, tr] of Track) if (!seen.has(id)) { busLayer.removeLayer(tr.marker); Track.delete(id); }
+  updateMarkers(performance.now());
+  kickAnim();
+}
+function updateMarkers(pt) {
+  const T = now();
+  for (const tr of Track.values()) {
+    const e = estimate(tr, T); tr.last = e;
+    let p = e.p;
+    if (tr.anim) {
+      const k = Math.min(1, (pt - tr.anim.t0) / ANIM_MS), ease = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      p = [tr.anim.from[0] + (p[0] - tr.anim.from[0]) * ease, tr.anim.from[1] + (p[1] - tr.anim.from[1]) * ease];
+      if (k >= 1) tr.anim = null;
+    }
+    tr.marker.setLatLng(p); tr.shown = p;
+    const stopped = !!(tr.vel && tr.vel.speed === 0);
+    const cls = (e.est ? "est" : "") + (stopped ? " stop" : "");
+    if (tr.estShown !== cls) { const el = tr.marker.getElement(); const mk = el && el.querySelector(".busmk"); if (mk) { mk.classList.toggle("est", e.est); mk.classList.toggle("stop", stopped); tr.estShown = cls; } }
+  }
+}
+function updateStaleMarkers() { for (const tr of Track.values()) tr.estShown = null; updateMarkers(performance.now()); }
+let animOn = false, lastFrame = 0;
+function kickAnim() { if (!animOn && !REDUCE_MOTION && Track.size && !document.hidden) { animOn = true; requestAnimationFrame(frame); } }
+function frame(ts) {
+  if (document.hidden || !Track.size) { animOn = false; return; }
+  if (ts - lastFrame >= 66) { lastFrame = ts; updateMarkers(performance.now()); }  // ~15 fps alcanza y ahorra batería
+  requestAnimationFrame(frame);
+}
+// Polilíneas de las líneas con unidades en vivo (para extrapolar sobre el recorrido). 1 pedido por línea y sesión.
+async function ensureRoutePoly(routeId, force) {
+  if ((!S.settings.interp && !force) || S.routePolys[routeId] || S.polyLoading.has(routeId)) return;
+  S.polyLoading.add(routeId);
+  try {
+    const r = await api("stops-for-route/" + encodeURIComponent(routeId), { includePolylines: true });
+    indexRefs(r.data.references);
+    storeRoutePolys(routeId, r.data.entry);
+    for (const tr of Track.values()) if (tr.meta.routeId === routeId) computeVel(tr);
+  } catch (e) { S.routePolys[routeId] = []; }
+}
+// Polilíneas por sentido primero (con sus paradas proyectadas: definen los tramos), después las generales.
+function storeRoutePolys(routeId, e) {
+  const all = [];
+  for (const g of (e && e.stopGroupings) || []) for (const sg of g.stopGroups || []) for (const p of sg.polylines || []) {
+    const pp = prepPoly(decodePoly(p.points)); if (!pp) continue;
+    pp.routeId = routeId; pp.stops = [];
+    for (const sid of sg.stopIds || []) {
+      const st = S.stopsCache[sid]; if (!st) continue;
+      const pr = project(pp, [st.lat, st.lon]); const last = pp.stops[pp.stops.length - 1];
+      if (pr.off < 80 && (!last || pr.along > last.along + 1)) pp.stops.push({ id: sid, along: pr.along });
+    }
+    all.push(pp);
+  }
+  for (const p of (e && e.polylines) || []) { const pp = prepPoly(decodePoly(p.points)); if (pp) { pp.routeId = routeId; pp.stops = []; all.push(pp); } }
+  S.routePolys[routeId] = all;
+}
+
+/* -------- entrenamiento del interpolado ("Estoy en este bondi") ---------
+   Adentro del bondi avisás "Estoy en este bondi". Mientras dura la sesión:
+   - el GPS del celu (watchPosition de alta precisión, ~1 fix/s) se proyecta sobre el recorrido y
+     se mide la velocidad real por TRAMO (entre paradas consecutivas del sentido; sin paradas, cada 300 m);
+   - en cada fix nuevo del feed para ese viaje se guarda un par celu/feed y se estima el desfase
+     del feed (hora que informa el feed − hora a la que el celu pasó por ese mismo punto).
+   Filtros: precisión > 50 m, saltos > 30 m/s, fuera del recorrido (> 60 m), cortes > 20 s, y paradas
+   largas (semáforo/parada > 20 s no cuentan como tiempo de viaje). Una pasada vale si cubrió ≥ 40% del
+   tramo, ≥ 60 m y ≥ 5 s, con velocidad entre 1 y 25 m/s. Por tramo se guarda la mediana de las últimas 15.
+   TODO queda en este dispositivo (localStorage bondi2.trainModel / trainPairs / trainSession). No se sube. */
+const TRAIN = { MAX_PASSES: 15, MAX_PAIRS: 1500, MAX_LAG: 40, MAX_AGE_MS: 3 * 3600e3, ACC_MAX: 50, OFF_MAX: 60, JUMP: 30, GAP_S: 20, STOP_V: 0.8, STOP_MAX_S: 20, CHUNK: 300 };
+const TM = { model: null, pairs: [] };
+function tmLoad() {
+  const m = ls("trainModel"); TM.model = m && m.v === 1 && m.segs ? m : { v: 1, segs: {}, lag: [], sessions: 0 };
+  const pr = ls("trainPairs"); TM.pairs = Array.isArray(pr) ? pr : [];
+}
+tmLoad();
+function trainSave() { ls("trainModel", TM.model); }
+function median(a) { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+function segAt(poly, along) {
+  const st = poly.stops || [];
+  if (st.length >= 2 && along >= st[0].along - 1 && along <= st[st.length - 1].along + 1) {
+    let i = 0; while (i < st.length - 2 && st[i + 1].along <= along) i++;
+    return { key: poly.routeId + "|" + st[i].id + ">" + st[i + 1].id, a0: st[i].along, a1: st[i + 1].along };
+  }
+  const k = Math.max(0, Math.floor(along / TRAIN.CHUNK));
+  return { key: poly.routeId + "|~" + Math.round(poly.len) + ":" + k, a0: k * TRAIN.CHUNK, a1: Math.min(poly.len, (k + 1) * TRAIN.CHUNK) };
+}
+function modelSpeed(key) { const m = TM.model.segs[key]; if (!m || !m.p.length) return null; return { v: median(m.p.map(x => x[0])), n: m.p.length }; }
+function lagMs() { const L = TM.model.lag; if (!L || L.length < 3) return 0; return Math.max(-30000, Math.min(60000, median(L.map(x => x[0])))); }
+// Avanza `dt` s desde `along` usando la velocidad aprendida de cada tramo (con pocas pasadas se mezcla
+// con la velocidad de los últimos fixes; tramo sin datos → velocidad de los fixes).
+function modelAdvance(poly, along, fallback, dt) {
+  let pos = along, left = dt, used = false;
+  for (let i = 0; i < 12 && left > 0.01 && pos < poly.len - 0.5; i++) {
+    const sg = segAt(poly, pos + 0.01), m = modelSpeed(sg.key);
+    let sp = fallback;
+    if (m) { used = true; sp = m.n >= 3 ? m.v : (m.v * m.n + fallback) / (m.n + 1); }
+    sp = Math.min(MAX_SPEED, Math.max(0.5, sp));
+    const room = Math.max(0.5, sg.a1 - pos), need = room / sp;
+    if (left <= need) { pos += sp * left; left = 0; } else { pos += room; left -= need; }
+  }
+  return { d: pos - along, used };
+}
+const TR = { session: null, watch: null, prev: null, poly: null, pass: null, hist: [], jumps: 0 };
+function trainStart(tripId, routeId) {
+  if (!tripId || !routeId) return;
+  if (!("geolocation" in navigator)) return toast("Este navegador no ofrece ubicación: no puedo entrenar");
+  if (TR.session) trainEnd(false, true);
+  const r = routeOf(routeId), tr = Track.get(tripId), veh = (S.vehicles || []).find(v => v.tripId === tripId),
+    arr = (S.arrivals || []).find(a => a.tripId === tripId);
+  TR.session = { sid: Date.now().toString(36), tripId, routeId, label: routeLabel(r),
+    headsign: (veh && veh.trip.tripHeadsign) || (arr && arr.tripHeadsign) || "", t0: Date.now(),
+    st: { fixes: 0, ok: 0, rejAcc: 0, rejJump: 0, rejOff: 0, stopsDropped: 0, passes: 0, pairs: 0, lastAcc: null, lastFix: 0 } };
+  ls("trainSession", TR.session);
+  ensureRoutePoly(routeId, true);
+  trainWatch();
+  renderTrainBar();
+  toast("🎓 Entrenando con este bondi. Dejá la pantalla prendida. Los datos quedan solo en este celu.", 4500);
+  const h = "#/route/" + encodeURIComponent(routeId);
+  if (location.hash !== h) go(h); else { S.selTrip = tripId; renderRouteList(); drawVehicles(); }
+}
+function trainWatch() {
+  if (TR.watch != null) navigator.geolocation.clearWatch(TR.watch);
+  TR.watch = navigator.geolocation.watchPosition(trainOnPhone, err => {
+    if (err.code === 1) { toast("Sin permiso de ubicación: no puedo entrenar"); trainEnd(true, true); }
+  }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
+}
+function trainNewPass(poly, along) { const sg = segAt(poly, along); return { key: sg.key, seg: sg, d: 0, t: 0, stopRun: 0 }; }
+function flushStop(ps) {
+  if (!(ps.stopRun > 0)) return;
+  if (ps.stopRun <= TRAIN.STOP_MAX_S) ps.t += ps.stopRun;          // frenada corta: es parte del viaje
+  else if (TR.session) TR.session.st.stopsDropped++;               // semáforo/parada larga: outlier, no cuenta
+  ps.stopRun = 0;
+}
+function closePass() {
+  const ps = TR.pass, s = TR.session; TR.pass = null; if (!ps || !s) return;
+  flushStop(ps);
+  const len = ps.seg.a1 - ps.seg.a0, v = ps.t > 0 ? ps.d / ps.t : 0;
+  if (ps.d < 60 || ps.t < 5 || v < 1 || v > 25 || ps.d < 0.4 * len) return;
+  const m = TM.model.segs[ps.key] || (TM.model.segs[ps.key] = { len: Math.round(len), p: [] });
+  m.p.push([Math.round(v * 100) / 100, Math.round(ps.d), Math.round(ps.t), Date.now(), s.sid]);
+  while (m.p.length > TRAIN.MAX_PASSES) m.p.shift();
+  s.st.passes++; trainSave();
+}
+function trainOnPhone(p) {
+  const s = TR.session; if (!s) return;
+  const c = p.coords, f = { t: p.timestamp || Date.now(), lat: c.latitude, lon: c.longitude, acc: c.accuracy == null ? 999 : c.accuracy };
+  const st = s.st; st.fixes++; st.lastAcc = Math.round(f.acc); st.lastFix = Date.now();
+  showMe([f.lat, f.lon]);
+  if (Date.now() - s.t0 > TRAIN.MAX_AGE_MS) { trainEnd(false, true); return toast("Sesión de entrenamiento cerrada (3 h)"); }
+  if (TR.prev && f.t - TR.prev.t < 900) return;                   // ~1 fix por segundo alcanza
+  if (f.acc > TRAIN.ACC_MAX) { st.rejAcc++; return trainTick(); }
+  if (TR.prev) {
+    const dt = (f.t - TR.prev.t) / 1000;
+    if (dt <= 0) return;
+    if (dt > TRAIN.GAP_S) { closePass(); TR.prev = null; TR.jumps = 0; }
+    else if (dist([TR.prev.lat, TR.prev.lon], [f.lat, f.lon]) / dt > TRAIN.JUMP) {
+      st.rejJump++;
+      if (++TR.jumps < 3) return trainTick();                      // GPS saltado: se descarta este fix
+      closePass(); TR.prev = null;                                  // 3 seguidos: el raro era el anterior
+    }
+  }
+  TR.jumps = 0;
+  const pv = TR.prev;
+  let poly = TR.poly, pr = poly ? project(poly, [f.lat, f.lon]) : null;
+  if (!pr || pr.off > TRAIN.OFF_MAX || (pv && pv.poly === poly && pr.along < pv.along - 15)) {
+    const fb = findPoly(s.routeId, [f.lat, f.lon], pv ? [pv.lat, pv.lon] : null);
+    poly = fb ? fb.poly : null; pr = fb ? fb.pr : null;
+  }
+  if (!poly) { st.rejOff++; closePass(); f.poly = null; TR.prev = f; TR.poly = null; return trainTick(); }
+  TR.poly = poly; f.poly = poly; f.along = pr.along; f.seg = segAt(poly, pr.along).key;
+  TR.hist.push(f); while (TR.hist.length && f.t - TR.hist[0].t > 600000) TR.hist.shift();
+  st.ok++;
+  if (!TR.pass || TR.pass.key !== f.seg) { closePass(); TR.pass = trainNewPass(poly, pr.along); }
+  if (pv && pv.poly === poly) {
+    const dt = (f.t - pv.t) / 1000, dAl = Math.max(0, f.along - pv.along), ps = TR.pass;
+    // Detenido si avanza < STOP_V m/s, o si ya estaba detenido y no se alejó > 6 m del punto donde frenó
+    // (así el ruido del GPS parado no cuenta como "moverse").
+    const still = dAl / dt < TRAIN.STOP_V || (ps.stopRun > 0 && f.along - ps.stopAt < 6);
+    if (still) { if (!(ps.stopRun > 0)) ps.stopAt = pv.along; ps.stopRun += dt; }
+    else { flushStop(ps); ps.t += dt; ps.d += dAl; }
+  }
+  TR.prev = f;
+  trainTick();
+}
+// Fix nuevo del feed para el viaje entrenado: par celu/feed + desfase.
+function trainOnObaFix(it) {
+  const s = TR.session, me = TR.hist[TR.hist.length - 1] || null;
+  let seg = "", lag = null;
+  const pt = [it.lat, it.lon];
+  let poly = TR.poly && project(TR.poly, pt).off < TRAIN.OFF_MAX ? TR.poly : null;
+  if (!poly) { const fb = findPoly(s.routeId, pt, null); poly = fb && fb.poly; }
+  if (poly) {
+    const al = project(poly, pt).along; seg = segAt(poly, al).key;
+    const h = TR.hist.filter(x => x.poly === poly);
+    for (let i = 1; i < h.length; i++) {
+      const a = h[i - 1], b = h[i];
+      if (a.along <= al && b.along >= al && b.along > a.along && b.t - a.t < 30000) lag = it.t - (a.t + (b.t - a.t) * (al - a.along) / (b.along - a.along));
+    }
+  }
+  const r5 = x => Math.round(x * 1e5) / 1e5;
+  TM.pairs.push({ t: Date.now(), pt: me ? me.t : null, plat: me ? r5(me.lat) : null, plon: me ? r5(me.lon) : null, pacc: me ? Math.round(me.acc) : null,
+    olat: r5(+it.lat), olon: r5(+it.lon), llu: it.t, trip: s.tripId, route: s.routeId, seg, sid: s.sid, lag: lag == null ? null : Math.round(lag) });
+  while (TM.pairs.length > TRAIN.MAX_PAIRS) TM.pairs.shift();
+  ls("trainPairs", TM.pairs);
+  if (lag != null && Math.abs(lag) < 120000) {
+    TM.model.lag.push([Math.round(lag), Date.now(), s.sid]);
+    while (TM.model.lag.length > TRAIN.MAX_LAG) TM.model.lag.shift();
+    trainSave();
+  }
+  s.st.pairs++; trainTick();
+}
+function trainEnd(discard, silent) {
+  const s = TR.session; if (!s) return;
+  if (discard) TR.pass = null; else closePass();
+  if (TR.watch != null) navigator.geolocation.clearWatch(TR.watch);
+  TR.watch = null; TR.prev = null; TR.poly = null; TR.hist = []; TR.jumps = 0;
+  if (discard) {
+    for (const k in TM.model.segs) { const m = TM.model.segs[k]; m.p = m.p.filter(x => x[4] !== s.sid); if (!m.p.length) delete TM.model.segs[k]; }
+    TM.model.lag = TM.model.lag.filter(x => x[2] !== s.sid);
+    TM.pairs = TM.pairs.filter(x => x.sid !== s.sid); ls("trainPairs", TM.pairs);
+  } else TM.model.sessions = (TM.model.sessions || 0) + 1;
+  trainSave(); TR.session = null; localStorage.removeItem(NS + "trainSession");
+  if (!S.gpsWanted && meMarker) { map.removeLayer(meMarker); meMarker = null; }
+  renderTrainBar(); refreshTrainUi();
+  if (!silent) toast(discard ? "Sesión cancelada: no se guardó nada de este viaje" : `Listo: ${s.st.passes} pasada(s) por tramo aprendidas`);
+}
+function trainStats() {
+  const segs = Object.values(TM.model.segs), passes = segs.reduce((a, m) => a + m.p.length, 0);
+  return { segs: segs.length, passes, pairs: TM.pairs.length, lagN: TM.model.lag.length, lag: lagMs(), sessions: TM.model.sessions || 0 };
+}
+let trainTickT = 0;
+function trainTick() { const t = Date.now(); if (t - trainTickT < 500) return; trainTickT = t; ls("trainSession", TR.session); renderTrainBar(); }
+function renderTrainBar() {
+  const bar = $("#trainBar"), s = TR.session;
+  bar.classList.toggle("show", !!s); if (!s) return;
+  const st = s.st, wait = !st.lastFix || Date.now() - st.lastFix > 15000;
+  bar.querySelector(".tt").textContent = `🎓 Entrenando · línea ${s.label}${s.headsign ? " → " + s.headsign : ""} · ` +
+    (wait ? "esperando GPS del celu…" : `GPS ±${st.lastAcc} m`) + ` · ${st.passes} tramo(s) · ${st.pairs} par(es)`;
+}
+function refreshTrainUi() {
+  if (!S.view) return;
+  if (S.view.type === "route" && S.routeData) { renderRouteList(); drawVehicles(); }
+  else if (S.view.type === "stop" && S.view.loaded) renderArrivals();
+  else if (S.view.type === "settings") renderTrainStats();
+}
+function renderTrainStats() {
+  const el = $("#trainStats"); if (!el) return;
+  const t = trainStats();
+  el.innerHTML = `<div class="tstat">${t.segs} tramo(s) aprendidos · ${t.passes} pasada(s) · ${t.sessions} sesión(es)<br>${t.pairs} par(es) celu/feed guardados · desfase del feed: ${t.lagN >= 3 ? (t.lag >= 0 ? "~" + Math.round(t.lag / 1000) + " s de atraso" : "~" + Math.round(-t.lag / 1000) + " s adelantado") + ` (${t.lagN} muestras)` : "sin datos suficientes"}</div>`;
+}
+function trainExport() {
+  const blob = new Blob([JSON.stringify({ app: "Bondímetro v2", exported: new Date().toISOString(), model: TM.model, pairs: TM.pairs }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "bondimetro-entrenamiento.json"; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/* ---------------------- paradas en el mapa ----------------------- */
+let stopsTimer = null, stopsReq = 0;
+map.on("moveend", () => {
+  ls("view", { c: [map.getCenter().lat, map.getCenter().lng], z: map.getZoom() });
+  clearTimeout(stopsTimer); stopsTimer = setTimeout(loadMapStops, 350);
+});
+async function loadMapStops() {
+  if (S.view && S.view.type === "route") return;
+  if (map.getZoom() < 15) { stopLayer.clearLayers(); return; }
+  const c = map.getCenter(), b = map.getBounds();
+  const radius = Math.min(1500, Math.round(dist([c.lat, c.lng], [b.getNorth(), b.getEast()])));
+  const my = ++stopsReq;
+  try {
+    const r = await api("stops-for-location", { lat: r3(c.lat), lon: r3(c.lng), radius, maxCount: 150 });
+    if (my !== stopsReq || (S.view && S.view.type === "route")) return;
+    indexRefs(r.data.references);
+    drawStops(r.data.list || []);
+  } catch (e) { /* silencioso: el mapa sigue usable */ }
+}
+function drawStops(list) {
+  stopLayer.clearLayers();
+  for (const s of list) {
+    S.stopsCache[s.id] = s;
+    const m = L.circleMarker([s.lat, s.lon], { radius: 6, weight: 2, color: "#fff", fillColor: "#0f766e", fillOpacity: 1 });
+    m.on("click", () => go("#/stop/" + encodeURIComponent(s.id)));
+    m.bindTooltip(esc(s.name), { direction: "top", offset: [0, -6] });
+    stopLayer.addLayer(m);
+  }
+}
+
+/* ------------------------- geolocalización ----------------------- */
+// Solo se pide al tocar "Mi ubicación". Se pausa con la pestaña oculta. Precisión normal (alcanza para paradas a 600 m).
+function startGps(center = false) {
+  if (!("geolocation" in navigator)) { toast("Este navegador no ofrece ubicación"); return; }
+  let first = true;
+  S.gpsWanted = true; ls("gps", true);
+  if (S.watchId != null) navigator.geolocation.clearWatch(S.watchId);
+  S.watchId = navigator.geolocation.watchPosition(p => {
+    showMe([p.coords.latitude, p.coords.longitude]);
+    $("#btnLoc").classList.add("on");
+    if (first && center) { map.setView(S.here, Math.max(map.getZoom(), 16)); if (!S.view || S.view.type === "home") renderHome(); }
+    first = false;
+  }, err => {
+    $("#btnLoc").classList.remove("on");
+    if (err.code === 1) { S.gpsWanted = false; ls("gps", false); }
+    if (center) toast(err.code === 1 ? "Sin permiso de ubicación: mové el mapa o buscá la parada" : "No pude obtener la ubicación");
+  }, { enableHighAccuracy: false, maximumAge: 15000, timeout: 20000 });
+}
+function showMe(pt) {
+  S.here = pt;
+  if (!meMarker) meMarker = L.marker(pt, { icon: L.divIcon({ className: "", html: '<div class="memk"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 1000, keyboard: false }).addTo(map);
+  else meMarker.setLatLng(pt);
+}
+function pauseGps() { if (S.watchId != null) { navigator.geolocation.clearWatch(S.watchId); S.watchId = null; } }
+function resumeGps() { if (S.gpsWanted && S.watchId == null) startGps(false); }
+$("#btnLoc").onclick = () => { if (S.here) map.setView(S.here, Math.max(map.getZoom(), 16)); startGps(true); };
+
+/* ----------------------- hoja inferior --------------------------- */
+const sheet = $("#sheet");
+function setSheet(state) { sheet.className = state || ""; setTimeout(() => map.invalidateSize(), 260); }
+function cycleSheet() { setSheet(sheet.classList.contains("max") ? "min" : sheet.classList.contains("min") ? "" : "max"); }
+$("#grab").onclick = cycleSheet;
+(function dragSheet() {
+  let y0 = null;
+  $("#grab").addEventListener("touchstart", e => { y0 = e.touches[0].clientY; }, { passive: true });
+  $("#grab").addEventListener("touchend", e => {
+    if (y0 == null) return; const dy = e.changedTouches[0].clientY - y0; y0 = null;
+    if (Math.abs(dy) < 25) return;
+    const cur = sheet.classList.contains("max") ? 2 : sheet.classList.contains("min") ? 0 : 1;
+    setSheet(["min", "", "max"][Math.max(0, Math.min(2, cur + (dy < 0 ? 1 : -1)))]);
+  });
+})();
+function head(html) { $("#head").innerHTML = html; }
+function body(html) { $("#body").innerHTML = html; }
+
+/* --------------- acciones (delegación con data-*) ---------------- */
+// Nada de onclick="f('...')" con ids interpolados: los ids viajan en data-* y se leen con dataset.
+const ACTIONS = {
+  back: () => (history.length > 1 ? history.back() : go("#/")),
+  favStop: id => {
+    const i = S.favs.stops.findIndex(f => f.id === id);
+    if (i >= 0) S.favs.stops.splice(i, 1);
+    else { const s = S.stopsCache[id] || {}; S.favs.stops.push({ id, name: s.name || id, code: s.code || "" }); }
+    saveFavs(); renderStopHead(S.stopsCache[id], id); toast(i >= 0 ? "Quitada de favoritos" : "Guardada en favoritos");
+  },
+  favRoute: id => {
+    const i = S.favs.routes.findIndex(f => f.id === id);
+    if (i >= 0) S.favs.routes.splice(i, 1);
+    else { const r = S.routes[id] || {}; S.favs.routes.push({ id, label: routeLabel(r), name: r.longName || "", color: r.color || "" }); }
+    saveFavs(); renderRouteHead(id); toast(i >= 0 ? "Quitada de favoritos" : "Guardada en favoritos");
+  },
+  filter: id => { S.stopFilter = id || null; renderArrivals(); },
+  pick: trip => {
+    S.selTrip = S.selTrip === trip ? null : trip;
+    renderArrivals();
+    const tr = Track.get(trip), s = S.view && S.stopsCache[S.view.id];
+    if (S.selTrip && tr && s) fitVisible([tr.shown, [s.lat, s.lon]], 16);
+    else if (S.selTrip && !tr) toast("Este viaje no tiene posición GPS (solo horario)");
+  },
+  bus: trip => {
+    if (S.view && S.view.type === "stop") return ACTIONS.pick(trip);
+    S.selTrip = trip; if (S.view && S.view.type === "route") { renderRouteList(); drawVehicles(); }
+    const tr = Track.get(trip); if (tr) { map.setView(tr.shown, Math.max(map.getZoom(), 16), { animate: !REDUCE_MOTION }); tr.marker.openTooltip(); }
+  },
+  trainStart: (trip, el) => trainStart(trip, el && el.dataset.route),
+  trainEnd: () => trainEnd(false),
+  trainDiscard: () => trainEnd(true),
+  trainView: () => { if (TR.session) go("#/route/" + encodeURIComponent(TR.session.routeId)); },
+  trainClear: () => {
+    if (!confirm("¿Borrar todo lo aprendido (tramos, desfase y pares guardados)? Solo afecta a este dispositivo.")) return;
+    TM.model = { v: 1, segs: {}, lag: [], sessions: 0 }; TM.pairs = []; trainSave(); ls("trainPairs", []); renderTrainStats(); toast("Datos de entrenamiento borrados");
+  },
+  trainExport: () => trainExport(),
+  dir: i => { S.routeDir = +i; ls("dir." + S.view.id, S.routeDir); drawRoute(true); renderRouteList(); drawVehicles(); },
+  scope: v => { S.routeAll = v === "all"; ls("routeAll", S.routeAll); drawRoute(false); renderRouteList(); drawVehicles(); },
+  fitBuses: () => { const pts = [...Track.values()].map(t => t.shown); if (pts.length) fitVisible(pts, 16); else toast("No hay unidades con GPS ahora"); },
+  cluster: i => {
+    const c = S.clusters[+i]; if (!c) return; const known = CITIES.find(x => x[0] === c.name);
+    setSheet("");
+    if (known) map.setView([known[1], known[2]], 14); else map.fitBounds(L.latLngBounds(c.pts).pad(0.3));
+    setTimeout(() => go("#/"), 50);
+  },
+  retry: () => { if (!P.fn) return route(); P.stopped = null; P.errs = 0; S.connErr = null; runPoll(); },
+  save: () => saveSettings(),
+  test: () => testConn(),
+  reset: () => { S.settings = Object.assign({}, DEFAULTS); ls("settings", S.settings); S.transport = null; openSettings(); toast("Valores de fábrica"); }
+};
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-go],[data-act]"); if (!el) return;
+  if (el.dataset.go != null) { e.preventDefault(); if (el.dataset.close) closeSearch(); go(el.dataset.go); return; }
+  const fn = ACTIONS[el.dataset.act]; if (fn) { e.preventDefault(); fn(el.dataset.arg, el); }
+});
+document.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches('[role="button"]')) { e.preventDefault(); e.target.click(); }
+});
+const goAttr = h => `role="button" tabindex="0" data-go="${esc(h)}"`;
+const actAttr = (a, arg) => `data-act="${esc(a)}"${arg != null ? ` data-arg="${esc(arg)}"` : ""}`;
+
+/* --------------------------- ruteo ------------------------------- */
+function go(h) { if (location.hash === h) route(); else location.hash = h; }
+window.addEventListener("hashchange", route);
+function route() {
+  const h = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
+  stopPoll(); clearTracks(); routeLayer.clearLayers(); S.selTrip = null; S.connErr = null; S.lastOk = 0;
+  if (selStopMarker) { map.removeLayer(selStopMarker); selStopMarker = null; }
+  if (h.startsWith("stop/")) return openStop(h.slice(5));
+  if (h.startsWith("route/")) return openRoute(h.slice(6));
+  if (h === "settings") return openSettings();
+  if (h === "cities") return openCities();
+  return renderHome();
+}
+
+/* ------------------------- reloj de 1 s -------------------------- */
+// Avanza cuentas regresivas, "GPS hace X", distancias estimadas y el estado de la conexión entre consultas.
+// La hora de llegada es siempre la que informa el servidor (predictedArrivalTime); acá solo se descuenta.
+function fmtEta(t) {
+  const s = (t - now()) / 1000;
+  if (s < 30) return ["ya", "llegando", "llegando"];
+  if (s < 180) { const r = Math.round(s / 5) * 5; const txt = Math.floor(r / 60) + ":" + String(r % 60).padStart(2, "0"); return [txt, "min", "llega en " + txt + " minutos"]; }
+  const m = Math.round(s / 60);
+  return m > 99 ? [hhmm(t), "", "llega a las " + hhmm(t)] : [String(m), "min", "llega en " + m + " minutos"];
+}
+let wasStale = null;
+function tick() {
+  for (const el of document.querySelectorAll("[data-t]")) {
+    const [big, small, aria] = fmtEta(+el.dataset.t);
+    el.textContent = big; const sm = el.nextElementSibling; if (sm) sm.textContent = small;
+    if (el.parentElement) el.parentElement.setAttribute("aria-label", aria);
+  }
+  for (const el of document.querySelectorAll("[data-loc]")) {
+    const age = now() - +el.dataset.loc; el.textContent = "GPS hace " + fmtAgo(age); el.classList.toggle("stale", age > 180000);
+  }
+  for (const el of document.querySelectorAll("[data-dist]")) {
+    const tr = Track.get(el.dataset.trip), mv = tr && tr.last ? tr.last.moved : 0;
+    el.textContent = (mv > 0 ? "≈ " : "") + fmtDist(+el.dataset.dist - mv);
+  }
+  const u = $("#upd");
+  if (u) {
+    if (P.stopped) u.textContent = "⛔ Actualización frenada por error de clave";
+    else if (S.connErr) u.textContent = (S.lastOk ? "⚠️ Sin conexión · último dato hace " + fmtAgo(Date.now() - S.lastOk) : "⚠️ Sin conexión · sin datos") + (P.next ? " · reintento en " + fmtAgo(P.next - Date.now()) : "");
+    else if (S.lastOk) u.textContent = "Actualizado hace " + fmtAgo(Date.now() - S.lastOk) + (P.next && !document.hidden ? " · próximo en " + fmtAgo(P.next - Date.now()) : "") + ` (cada ${Math.round(P.base / 1000)} s)`;
+    else u.textContent = "";
+  }
+  const st = P.fn ? isStale() : false;
+  const changed = wasStale !== null && st !== wasStale;
+  wasStale = st;                     // antes de re-renderizar: renderArrivals() llama a tick()
+  if (changed && S.view && S.view.loaded) showPollError();
+  if (REDUCE_MOTION && Track.size) updateMarkers(performance.now());
+  if (TR.session) renderTrainBar();
+}
+setInterval(tick, 1000);
+
+/* ============================ VISTAS ============================= */
+
+/* ---- inicio: favoritos + cercanas ---- */
+async function renderHome() {
+  S.view = { type: "home" };
+  if (sheet.classList.contains("max")) setSheet("");
+  const zone = cityName(map.getCenter().lat, map.getCenter().lng);
+  head(`<h2>Bondímetro<span class="ver">v2</span> <span class="sub">${zone ? "· " + esc(zone) : ""}</span></h2>`);
+  let html = "";
+  if (Object.keys(URL_OVERRIDES).length) html += `<div class="alert">🧪 Modo prueba por URL (${esc(Object.keys(URL_OVERRIDES).join(", "))}). No se guarda salvo que toques Guardar en Ajustes.</div>`;
+  if (S.favs.stops.length || S.favs.routes.length) {
+    html += `<div class="sec">Favoritos</div>`;
+    for (const f of S.favs.routes) html += `<div class="item" ${goAttr("#/route/" + encodeURIComponent(f.id))}>${badge(S.routes[f.id] || { id: f.id, shortName: f.label, color: f.color })}<div class="mid"><div class="t">${esc(f.name || "Línea " + f.label)}</div><div class="s">Línea · todas las unidades en el mapa</div></div></div>`;
+    for (const f of S.favs.stops) html += `<div class="item" ${goAttr("#/stop/" + encodeURIComponent(f.id))}><span class="badge" style="background:#0f766e">P</span><div class="mid"><div class="t">${esc(f.name)}</div><div class="s">${f.code ? "Parada " + esc(f.code) : "Parada"}</div></div></div>`;
+  }
+  html += `<div class="sec">Paradas cerca ${S.here ? "tuyo" : "del centro del mapa"}</div>`;
+  if (!S.here) html += `<div class="small muted" style="margin:0 4px 4px">Tocá ◎ arriba para usar tu ubicación.</div>`;
+  html += `<div id="near"><div class="note"><span class="spin"></span> Buscando paradas…</div></div><div class="small" style="margin:10px 4px">${gridLink()}</div>`;
+  body(html);
+  const ref = S.here || [map.getCenter().lat, map.getCenter().lng];
+  try {
+    const r = await api("stops-for-location", { lat: r3(ref[0]), lon: r3(ref[1]), radius: 600, maxCount: 40 });
+    indexRefs(r.data.references);
+    const list = (r.data.list || []).map(s => ({ s, d: dist(ref, [s.lat, s.lon]) })).sort((a, b) => a.d - b.d).slice(0, 15);
+    if (!S.view || S.view.type !== "home") return;
+    if (!list.length) { $("#near").innerHTML = `<div class="note">No hay paradas con datos en 600 m${r.data.outOfRange ? " (zona fuera de cobertura del servidor)" : ""}. Mové el mapa o <a href="#/cities">elegí una ciudad con cobertura</a>.</div>`; return; }
+    $("#near").innerHTML = list.map(({ s, d }) => `
+      <div class="item" ${goAttr("#/stop/" + encodeURIComponent(s.id))}>
+        <div class="mid"><div class="t">${esc(s.name)}</div>
+        <div class="s">${fmtDist(d)}${s.direction ? " · hacia " + esc(s.direction) : ""}${s.code ? " · " + esc(s.code) : ""}</div>
+        <div class="badges">${(s.routeIds || []).map(id => badge(S.routes[id] || { id })).join("")}</div></div>
+      </div>`).join("");
+  } catch (e) {
+    if ($("#near") && S.view && S.view.type === "home") $("#near").innerHTML = `<div class="note err">${errMsg(e)}</div>`;
+  }
+}
+
+/* ---- parada: arribos en vivo ---- */
+function openStop(id) {
+  S.view = { type: "stop", id };
+  if (sheet.classList.contains("min")) setSheet("");
+  const known = S.stopsCache[id];
+  S.stopFilter = null; S.arrivals = [];
+  renderStopHead(known, id);
+  body(`<div class="note"><span class="spin"></span> Consultando arribos…</div>`);
+  if (known) focusStop(known);
+  startPoll(signal => loadArrivals(id, signal), S.settings.refresh);
+}
+function renderStopHead(s, id) {
+  const fav = S.favs.stops.some(f => f.id === id);
+  head(`<button class="iconbtn" ${actAttr("back")} aria-label="Volver">${backSvg}</button>
+    <h2>${esc(s ? s.name : "Parada")}<br><span class="sub">${s && s.code ? "Parada " + esc(s.code) : ""}${s && s.direction ? " · hacia " + esc(s.direction) : ""}</span></h2>
+    <button class="iconbtn star ${fav ? "on" : ""}" ${actAttr("favStop", id)} aria-label="Favorito" aria-pressed="${fav}">${starSvg(fav)}</button>`);
+}
+function focusStop(s) {
+  if (selStopMarker) map.removeLayer(selStopMarker);
+  selStopMarker = L.circleMarker([s.lat, s.lon], { pane: "selPane", radius: 10, weight: 4, color: "#fff", fillColor: "#f59e0b", fillOpacity: 1 }).addTo(map);
+  fitVisible([[s.lat, s.lon]], 16);
+}
+function fitVisible(pts, maxZoom = 16) { map.fitBounds(L.latLngBounds(pts), Object.assign({ maxZoom, animate: !REDUCE_MOTION }, sheetPad())); }
+async function loadArrivals(id, signal) {
+  const r = await api("arrivals-and-departures-for-stop/" + encodeURIComponent(id), { minutesBefore: 1, minutesAfter: 120 }, signal);
+  if (!S.view || S.view.type !== "stop" || S.view.id !== id) return;
+  indexRefs(r.data.references);
+  const stop = S.stopsCache[id];
+  if (stop) { renderStopHead(stop, id); if (!selStopMarker) focusStop(stop); }
+  S.arrivals = r.data.entry.arrivalsAndDepartures || [];
+  S.situations = (r.data.references && r.data.references.situations) || [];
+  S.lastOk = Date.now(); S.connErr = null; S.view.loaded = true;
+  renderArrivals();
+  if (stop && !S.view.fitted) {
+    S.view.fitted = true;
+    const pts = [[stop.lat, stop.lon]];
+    S.arrivals.map(a => [arrTime(a), a]).filter(([t, a]) => t.live && t.t > now() - 60000 && Track.has(a.tripId))
+      .sort((x, y) => x[0].t - y[0].t).slice(0, 2).forEach(([, a]) => pts.push(Track.get(a.tripId).shown));
+    fitVisible(pts, 16);
+  }
+}
+function arrTime(a) {
+  const p = a.predicted && a.predictedArrivalTime > 0 ? a.predictedArrivalTime : (a.predicted && a.predictedDepartureTime > 0 ? a.predictedDepartureTime : 0);
+  const sch = a.scheduledArrivalTime || a.scheduledDepartureTime;
+  return { t: p || sch, live: !!p, sch };
+}
+function locTime(ts) { return (ts && (ts.lastLocationUpdateTime || ts.lastUpdateTime)) || 0; }
+function renderArrivals() {
+  if (!S.view || S.view.type !== "stop") return;
+  const t0 = now(), stale = isStale();
+  let list = S.arrivals.map(a => Object.assign({ _: arrTime(a) }, a)).filter(a => a._.t >= t0 - 60000).sort((a, b) => a._.t - b._.t);
+  const lines = [...new Map(list.map(a => [a.routeId, routeOf(a.routeId, a.routeShortName)])).values()];
+  if (S.stopFilter && !lines.some(r => r.id === S.stopFilter)) S.stopFilter = null;
+  if (S.stopFilter) list = list.filter(a => a.routeId === S.stopFilter);
+  let html = errBox();
+  for (const sit of S.situations || []) {
+    const txt = (sit.summary && sit.summary.value) || (sit.description && sit.description.value);
+    if (txt) html += `<div class="alert">⚠️ ${esc(txt)}</div>`;
+  }
+  if (lines.length > 1) html += `<div class="chips"><button class="chip ${S.stopFilter ? "" : "on"}" ${actAttr("filter", "")}>Todas</button>${lines.map(r => `<button class="chip ${S.stopFilter === r.id ? "on" : ""}" ${actAttr("filter", r.id)}>${esc(routeLabel(r))}</button>`).join("")}</div>`;
+  // Acceso directo a la vista de línea: TODAS las unidades de esa línea en el mapa.
+  if (lines.length) html += `<div class="chips">${lines.map(r => `<button class="chip lineall" data-go="#/route/${esc(encodeURIComponent(r.id))}" aria-label="Ver todos los bondis de la línea ${esc(routeLabel(r))} en el mapa">🗺️ Todos los ${esc(routeLabel(r))}</button>`).join("")}</div>`;
+  html += `<div id="arrList">`;
+  if (!list.length) html += `<div class="note">No hay arribos informados para las próximas 2 horas.<div>${gridLink()}</div></div>`;
+  else if (!list.some(a => a._.live)) html += `<div class="small muted" style="margin:0 4px 6px">Ningún bondi con GPS en vivo para esta parada ahora. ${gridLink()}</div>`;
+  for (const a of list.slice(0, 30)) {
+    const r = routeOf(a.routeId, a.routeShortName), ts = a.tripStatus || {}, meta = [];
+    if (a._.live) {
+      meta.push(stale ? `<span class="stale">⚠️ último dato (sin conexión)</span>` : `<span class="live"><span class="dot"></span>en vivo</span>`);
+      const dev = Math.round((a._.t - a._.sch) / 60000);
+      if (a._.sch && Math.abs(dev) >= 2) meta.push(`<span class="${dev > 0 ? "late" : "early"}">${Math.abs(dev)} min ${dev > 0 ? "tarde" : "antes"}</span>`);
+      const loc = locTime(ts) || a.lastUpdateTime;
+      if (loc) meta.push(`<span data-loc="${loc}">GPS hace ${fmtAgo(now() - loc)}</span>`);
+    } else meta.push(`<span class="sched">programado ${hhmm(a._.t)}</span>`);
+    if (a.numberOfStopsAway > 0 && a.numberOfStopsAway < 80) meta.push(`${a.numberOfStopsAway} parada${a.numberOfStopsAway > 1 ? "s" : ""}`);
+    if (a.distanceFromStop > 0 && a._.live) meta.push(`<span data-dist="${Math.round(a.distanceFromStop)}" data-trip="${esc(a.tripId)}">${fmtDist(a.distanceFromStop)}</span>`);
+    const training = TR.session && TR.session.tripId === a.tripId;
+    const trainBtn = training ? `<div class="trainrow small"><b>🎓 Entrenando con este bondi</b></div>`
+      : (S.selTrip === a.tripId && a._.live && ts.position) ? `<div class="trainrow"><button class="chip train" data-act="trainStart" data-arg="${esc(a.tripId)}" data-route="${esc(a.routeId)}" aria-label="Estoy en este bondi: entrenar el interpolado con el GPS del celu">🚌 Estoy en este bondi</button></div>` : "";
+    html += `<div class="arr${S.selTrip === a.tripId ? " sel" : ""}" role="button" tabindex="0" ${actAttr("pick", a.tripId)}>
+      ${badge(r)}
+      <div class="mid"><div class="hs">${esc(a.tripHeadsign || r.longName || "")}</div><div class="meta">${meta.join(" · ")}</div>${trainBtn}</div>
+      <div class="eta"><b class="${a._.live && !stale ? "" : "sched-n"}" data-t="${a._.t}"></b><small></small></div></div>`;
+  }
+  html += `</div><div class="upd" id="upd"></div>`;
+  const sc = $("#body").scrollTop; body(html); $("#body").scrollTop = sc;
+  drawArrivalBuses();
+  tick();
+}
+function drawArrivalBuses() {
+  const items = [], seen = new Set(), stop = S.stopsCache[S.view.id], stale = isStale();
+  for (const a of S.arrivals) {
+    const ts = a.tripStatus; if (!ts || !ts.position || !ts.position.lat || !arrTime(a).live) continue;
+    if (S.stopFilter && a.routeId !== S.stopFilter) continue;
+    if (seen.has(a.tripId)) continue; seen.add(a.tripId);
+    const r = routeOf(a.routeId, a.routeShortName), loc = locTime(ts);
+    // Si se acerca a esta parada, no extrapolar más allá de ella (dejamos 15 m).
+    const maxAhead = a.distanceFromStop > 0 && stop ? Math.min(a.distanceFromStop, dist([ts.position.lat, ts.position.lon], [stop.lat, stop.lon]) + 30) - 15 : NaN;
+    items.push({ id: a.tripId, routeId: a.routeId, lat: ts.position.lat, lon: ts.position.lon, t: loc || now(), bearing: ts.orientation,
+      old: (loc && now() - loc > 180000) || stale, z: S.selTrip === a.tripId ? 900 : 500, maxAhead,
+      tip: `${esc(routeLabel(r))} → ${esc(a.tripHeadsign || "")}` });
+    ensureRoutePoly(a.routeId);
+  }
+  syncBuses(items);
+}
+
+/* ---- línea: recorrido + TODAS las unidades en vivo ---- */
+// Se entra con #/route/<id>: desde la búsqueda, favoritos, la lista de paradas o el chip
+// "🗺️ Todos los <línea>" de una parada. Muestra en el mapa todas las unidades que devuelve
+// trips-for-route (ambos sentidos), refrescadas cada routeRefresh s e interpoladas.
+async function openRoute(id) {
+  S.view = { type: "route", id }; S.routeDir = ls("dir." + id) || 0; S.routeData = null; S.vehicles = [];
+  S.routeAll = ls("routeAll") !== false;   // por defecto: todas las unidades, ambos sentidos
+  if (TR.session && TR.session.routeId === id) S.selTrip = TR.session.tripId;
+  stopLayer.clearLayers();
+  if (sheet.classList.contains("min")) setSheet("");
+  renderRouteHead(id);
+  body(`<div class="note"><span class="spin"></span> Cargando recorrido…</div>`);
+  try {
+    const r = await api("stops-for-route/" + encodeURIComponent(id), { includePolylines: true });
+    if (!S.view || S.view.id !== id) return;
+    indexRefs(r.data.references);
+    const e = r.data.entry, groups = [];
+    for (const g of e.stopGroupings || []) for (const sg of g.stopGroups || []) groups.push({ id: sg.id, name: (sg.name && (sg.name.name || (sg.name.names || [])[0])) || "", stopIds: sg.stopIds || [], polys: (sg.polylines || []).map(p => decodePoly(p.points)) });
+    if (!groups.length) groups.push({ id: "0", name: "", stopIds: e.stopIds || [], polys: [] });
+    const allPolys = (e.polylines || []).map(p => decodePoly(p.points));
+    S.routeData = { id, groups, allPolys };
+    storeRoutePolys(id, e);
+    if (S.routeDir >= groups.length) S.routeDir = 0;
+    renderRouteHead(id); drawRoute(true); renderRouteList(); S.view.loaded = true;
+    startPoll(signal => loadRouteVehicles(id, signal), S.settings.routeRefresh);
+  } catch (e) { if (S.view && S.view.id === id) body(`<div class="note err">${errMsg(e)}<div class="row" style="margin-top:8px"><button class="btn ghost" data-act="retry">Reintentar</button></div><div>${gridLink()}</div></div>`); }
+}
+function renderRouteHead(id) {
+  const r = S.routes[id] || { id }, fav = S.favs.routes.some(f => f.id === id);
+  head(`<button class="iconbtn" ${actAttr("back")} aria-label="Volver">${backSvg}</button>
+    ${badge(r)}<h2>${esc(r.longName || r.description || "Línea " + routeLabel(r))}<br><span class="sub">${esc(S.agencyName[r.agencyId] || "")}</span></h2>
+    <button class="iconbtn star ${fav ? "on" : ""}" ${actAttr("favRoute", id)} aria-label="Favorito" aria-pressed="${fav}">${starSvg(fav)}</button>`);
+}
+function drawRoute(fit) {
+  routeLayer.clearLayers();
+  const d = S.routeData; if (!d) return;
+  const r = S.routes[d.id] || { id: d.id }, col = routeColor(r), g = d.groups[S.routeDir];
+  const polys = g.polys.length ? g.polys : d.allPolys, all = [];
+  // Con "todas las unidades", el recorrido completo de la línea va de fondo (fino) para ubicar las del otro sentido.
+  if (S.routeAll) for (const p of d.allPolys) L.polyline(p, { color: col, weight: 3, opacity: .3, interactive: false }).addTo(routeLayer);
+  for (const p of polys) { L.polyline(p, { color: col, weight: 5, opacity: .85 }).addTo(routeLayer); all.push(...p); }
+  for (const sid of g.stopIds) {
+    const s = S.stopsCache[sid]; if (!s) continue;
+    all.push([s.lat, s.lon]);
+    L.circleMarker([s.lat, s.lon], { radius: 4.5, weight: 2, color: col, fillColor: "#fff", fillOpacity: 1 })
+      .bindTooltip(esc(s.name)).on("click", () => go("#/stop/" + encodeURIComponent(sid))).addTo(routeLayer);
+  }
+  if (S.routeAll) for (const p of d.allPolys) all.push(...p);
+  if (fit && all.length) map.fitBounds(L.latLngBounds(all), Object.assign({ animate: !REDUCE_MOTION }, sheetPad()));
+}
+async function loadRouteVehicles(id, signal) {
+  const r = await api("trips-for-route/" + encodeURIComponent(id), { includeStatus: true, includeSchedule: false }, signal);
+  if (!S.view || S.view.id !== id) return;
+  indexRefs(r.data.references);
+  const trips = {}; for (const t of (r.data.references && r.data.references.trips) || []) trips[t.id] = t;
+  S.vehicles = (r.data.list || []).map(x => {
+    const st = x.status || {}; const trip = trips[x.tripId] || trips[st.activeTripId] || {};
+    return { tripId: x.tripId || st.activeTripId, trip, st, pos: st.position, dir: trip.directionId };
+  }).filter(v => v.tripId && v.pos && v.pos.lat);
+  S.lastOk = Date.now(); S.connErr = null;
+  renderRouteList(); drawVehicles();
+}
+function vehInGroup(v, g) {
+  const ns = v.st.nextStop || v.st.closestStop;
+  if (ns && g.stopIds.includes(ns)) return true;
+  if (!ns && v.dir != null) return String(v.dir) === String(S.routeDir);
+  return false;
+}
+function renderRouteList() {
+  const d = S.routeData; if (!d || !S.view || S.view.type !== "route") return;
+  const vehicles = S.vehicles || [], stale = isStale();
+  const r = S.routes[d.id] || { id: d.id }, col = routeColor(r), g = d.groups[S.routeDir];
+  let html = errBox();
+  if (d.groups.length > 1) html += `<div class="chips">${d.groups.map((x, i) => `<button class="chip ${i === S.routeDir ? "on" : ""}" ${actAttr("dir", i)}>${esc(x.name ? "Hacia " + x.name.replace(/^hacia\s+/i, "") : "Sentido " + (i + 1))}</button>`).join("")}</div>`;
+  const mine = vehicles.filter(v => vehInGroup(v, g));
+  html += `<div class="chips" id="scopeChips"><button class="chip ${S.routeAll ? "on" : ""}" ${actAttr("scope", "all")} aria-pressed="${!!S.routeAll}">Todas las unidades (${vehicles.length})</button><button class="chip ${S.routeAll ? "" : "on"}" ${actAttr("scope", "dir")} aria-pressed="${!S.routeAll}">Solo este sentido (${mine.length})</button><button class="chip" ${actAttr("fitBuses")}>🔍 Encuadrar bondis</button></div>`;
+  html += `<div class="small muted" id="routeSummary" style="margin:2px 4px 8px">${vehicles.length
+    ? `<span class="${stale ? "stale" : "live"}">${stale ? "⚠️ último dato (sin conexión)" : '<span class="dot"></span>en vivo'}</span> · ${vehicles.length} en circulación en la línea, ${mine.length} en este sentido${S.routeAll && vehicles.length > mine.length ? " (las del otro sentido, más claras)" : ""}`
+    : (S.lastOk ? `Sin bondis con GPS en esta línea ahora. ${gridLink()}` : "Buscando unidades…")}</div>`;
+  const sel = S.selTrip && vehicles.find(v => v.tripId === S.selTrip);
+  if (sel) {
+    const training = TR.session && TR.session.tripId === sel.tripId;
+    html += `<div class="selbus" id="selBus">${badge(r)}<span>${esc(sel.trip.tripHeadsign || "")}${sel.st.vehicleId ? " · interno " + esc(String(sel.st.vehicleId).split("_").pop()) : ""}${vehInGroup(sel, g) ? "" : " · otro sentido"}</span>` +
+      (training ? `<b>🎓 Entrenando con este bondi</b>` : `<button class="chip train" data-act="trainStart" data-arg="${esc(sel.tripId)}" data-route="${esc(d.id)}" aria-label="Estoy en este bondi: entrenar el interpolado con el GPS del celu">🚌 Estoy en este bondi</button>`) + `</div>`;
+  } else if (vehicles.length && !TR.session) html += `<div class="small muted" style="margin:0 4px 8px">¿Vas arriba de uno? Tocalo en el mapa o en la lista y elegí “🚌 Estoy en este bondi” para entrenar el interpolado.</div>`;
+  const byNext = {};
+  for (const v of mine) { const k = v.st.nextStop || v.st.closestStop || "?"; (byNext[k] = byNext[k] || []).push(v); }
+  g.stopIds.forEach((sid, i) => {
+    for (const v of byNext[sid] || []) {
+      const loc = locTime(v.st);
+      const dev = v.st.scheduleDeviation ? Math.round(v.st.scheduleDeviation / 60) : 0;
+      html += `<div class="rbus${S.selTrip === v.tripId ? " sel" : ""}" style="--rc:${col}" role="button" tabindex="0" ${actAttr("bus", v.tripId)}><div class="rail"><div class="bus"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2v2h-3v-2H8v2H5v-2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 3v5h14V7z"/></svg></div></div>
+        <div class="txt">${esc(v.trip.tripHeadsign || "")}${dev ? ` · <span class="${dev > 0 ? "late" : "early"}">${Math.abs(dev)} min ${dev > 0 ? "tarde" : "antes"}</span>` : ""}${loc ? ` · <span class="muted" data-loc="${loc}">GPS hace ${fmtAgo(now() - loc)}</span>` : ""}</div></div>`;
+    }
+    const s = S.stopsCache[sid] || { name: sid };
+    html += `<div class="rstop ${i === 0 ? "first" : ""} ${i === g.stopIds.length - 1 ? "last" : ""}" style="--rc:${col}" ${goAttr("#/stop/" + encodeURIComponent(sid))}><div class="rail"><i></i></div><div class="nm">${esc(s.name)}${s.code ? ` <span class="muted small">${esc(s.code)}</span>` : ""}</div></div>`;
+  });
+  html += `<div class="upd" id="upd"></div>`;
+  const sc = $("#body").scrollTop; body(html); $("#body").scrollTop = sc;
+  tick();
+}
+// TODAS las unidades de la línea en el mapa (las del otro sentido, semitransparentes), con marcadores reusados.
+function drawVehicles() {
+  const d = S.routeData; if (!d) return;
+  const r = S.routes[d.id] || { id: d.id }, g = d.groups[S.routeDir], stale = isStale(), items = [];
+  for (const v of S.vehicles || []) {
+    const inG = vehInGroup(v, g);
+    if (!S.routeAll && !inG) continue;
+    const loc = locTime(v.st);
+    items.push({ id: v.tripId, routeId: d.id, lat: v.pos.lat, lon: v.pos.lon, t: loc || now(), bearing: v.st.orientation,
+      old: (loc && now() - loc > 180000) || stale, faded: !inG && S.selTrip !== v.tripId, z: S.selTrip === v.tripId ? 900 : inG ? 800 : 400,
+      label: TR.session && TR.session.tripId === v.tripId ? "🎓" : undefined,
+      tip: `${esc(routeLabel(r))} → ${esc(v.trip.tripHeadsign || "")}${v.st.vehicleId ? " · interno " + esc(String(v.st.vehicleId).split("_").pop()) : ""}${loc ? " · GPS " + hhmm(loc) : ""}${inG ? "" : " · otro sentido"}` });
+  }
+  syncBuses(items);
+}
+
+/* ---- búsqueda ---- */
+let searchSeq = 0;
+const q = $("#q"), results = $("#results");
+q.addEventListener("input", () => { clearTimeout(q._t); q._t = setTimeout(doSearch, 250); });
+q.addEventListener("focus", () => { ensureRoutes(); if (q.value.trim()) doSearch(); });
+q.addEventListener("keydown", e => { if (e.key === "Enter") { const f = results.querySelector(".ri[data-go]"); if (f) f.click(); } if (e.key === "Escape") closeSearch(); });
+document.addEventListener("click", e => { if (!$("#searchBox").contains(e.target)) results.classList.remove("show"); });
+function closeSearch() { results.classList.remove("show"); q.blur(); }
+function nearAgencies(maxKm = 60, maxN = 25) {
+  const c = [map.getCenter().lat, map.getCenter().lng];
+  return S.agencies.map(a => ({ a, d: dist(c, [a.lat, a.lon]) })).filter(x => x.d < maxKm * 1000 + Math.max(x.a.latSpan || 0, x.a.lonSpan || 0) * 55000).sort((x, y) => x.d - y.d).slice(0, maxN).map(x => x.a);
+}
+async function ensureRoutes() {
+  const todo = nearAgencies().filter(a => !S.routesByAgency[a.id]);
+  for (let i = 0; i < todo.length; i += 4) {
+    await Promise.all(todo.slice(i, i + 4).map(async a => {
+      const cached = ls("routes." + a.id);
+      if (cached && Date.now() - cached.at < 3 * 864e5) { S.routesByAgency[a.id] = cached.list; cached.list.forEach(r => S.routes[r.id] = S.routes[r.id] || r); return; }
+      try {
+        const r = await api("routes-for-agency/" + encodeURIComponent(a.id));
+        const lst = (r.data.list || []).map(x => ({ id: x.id, shortName: x.shortName, longName: x.longName, description: x.description, color: x.color, textColor: x.textColor, agencyId: x.agencyId || a.id }));
+        S.routesByAgency[a.id] = lst; lst.forEach(x => S.routes[x.id] = S.routes[x.id] || x);
+        ls("routes." + a.id, { at: Date.now(), list: lst });
+      } catch (e) { S.routesByAgency[a.id] = []; }
+    }));
+  }
+}
+const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const routeRow = r => `<div class="ri" ${goAttr("#/route/" + encodeURIComponent(r.id))} data-close="1">${badge(r)}<div class="mid"><div class="t">${esc(r.longName || r.description || "Línea " + routeLabel(r))}</div><div class="s">${esc(S.agencyName[r.agencyId] || "")} · ver todos los bondis</div></div></div>`;
+async function doSearch() {
+  const text = q.value.trim(), my = ++searchSeq;
+  if (!text) { results.classList.remove("show"); return; }
+  const n = norm(text), near = new Set(nearAgencies().map(a => a.id));
+  const pool = Object.values(S.routes).filter(r => !r.agencyId || near.size === 0 || near.has(r.agencyId));
+  const score = r => { const sn = norm(r.shortName), ln = norm(r.longName) + " " + norm(r.description); return sn === n ? 0 : sn.startsWith(n) ? 1 : sn.includes(n) ? 2 : ln.includes(n) ? 3 : 9; };
+  const hits = pool.map(r => [score(r), r]).filter(x => x[0] < 9).sort((a, b) => a[0] - b[0] || String(a[1].shortName).localeCompare(String(b[1].shortName), "es", { numeric: true })).slice(0, 25).map(x => x[1]);
+  let html = hits.map(routeRow).join("");
+  results.innerHTML = html || `<div class="ri muted"><span class="spin"></span> Buscando…</div>`;
+  results.classList.add("show");
+  const c = map.getCenter();
+  try {
+    const [rr, ss] = await Promise.all([
+      api("routes-for-location", { lat: r3(c.lat), lon: r3(c.lng), radius: 30000, query: text }).catch(() => null),
+      /^\d{2,}$/.test(text) ? api("stops-for-location", { lat: r3(c.lat), lon: r3(c.lng), radius: 30000, query: text }).catch(() => null) : null
+    ]);
+    if (my !== searchSeq) return;
+    if (rr) { indexRefs(rr.data.references); for (const r of rr.data.list || []) { S.routes[r.id] = r; if (!hits.some(h => h.id === r.id)) hits.push(r); } }
+    let extra = "";
+    if (ss) { indexRefs(ss.data.references); for (const s of (ss.data.list || []).slice(0, 8)) { S.stopsCache[s.id] = s; extra += `<div class="ri" ${goAttr("#/stop/" + encodeURIComponent(s.id))} data-close="1"><span class="badge" style="background:#0f766e">P</span><div class="mid"><div class="t">${esc(s.name)}</div><div class="s">Parada ${esc(s.code || s.id)}</div></div></div>`; } }
+    html = hits.slice(0, 25).map(routeRow).join("") + extra;
+    results.innerHTML = html || `<div class="ri muted">Nada con «${esc(text)}» cerca de esta zona.</div>`;
+  } catch (e) { if (!html) results.innerHTML = `<div class="ri">${errMsg(e)}</div>`; }
+}
+
+/* ---- ciudades con cobertura ---- */
+$("#btnMenu").onclick = () => go(location.hash === "#/cities" ? "#/" : "#/cities");
+async function loadAgencies() {
+  const cached = ls("agencies");
+  if (cached && Date.now() - cached.at < 864e5) { S.agencies = cached.list; cached.list.forEach(a => S.agencyName[a.id] = a.name); return true; }
+  try {
+    const r = await api("agencies-with-coverage");
+    indexRefs(r.data.references);
+    S.agencies = (r.data.list || []).map(x => ({ id: x.agencyId, name: S.agencyName[x.agencyId] || x.agencyId, lat: x.lat, lon: x.lon, latSpan: x.latSpan, lonSpan: x.lonSpan }));
+    ls("agencies", { at: Date.now(), list: S.agencies });
+    return true;
+  } catch (e) { return !!S.agencies.length; }
+}
+function clusters() {
+  const out = [];
+  for (const a of S.agencies) {
+    if (!Number.isFinite(a.lat)) continue;
+    const name = cityName(a.lat, a.lon) || `Zona ${a.lat.toFixed(2)}, ${a.lon.toFixed(2)}`;
+    let c = out.find(x => x.name === name);
+    if (!c) out.push(c = { name, pts: [], ags: [] });
+    c.pts.push([a.lat, a.lon]); c.ags.push(a.name);
+  }
+  return out.sort((a, b) => b.ags.length - a.ags.length || a.name.localeCompare(b.name, "es"));
+}
+const gearSvg = `<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>`;
+async function openCities() {
+  S.view = { type: "cities" };
+  setSheet("max");
+  head(`<button class="iconbtn" data-go="#/" aria-label="Volver">${backSvg}</button><h2>Ciudades con datos</h2>
+    <button class="iconbtn" data-go="#/settings" aria-label="Ajustes">${gearSvg}</button>`);
+  body(`<div class="note"><span class="spin"></span> Consultando cobertura…</div>`);
+  const ok = await loadAgencies();
+  if (!S.view || S.view.type !== "cities") return;
+  if (!ok) { body(`<div class="note err">No pude obtener la lista de empresas. <a href="#/settings">Revisá la conexión</a>.</div>`); return; }
+  const cl = S.clusters = clusters();
+  body(`<div class="small muted" style="margin:4px 4px 8px">${S.agencies.length} empresas con datos en ${cl.length} zonas. Tocá una para ir.</div>` +
+    cl.map((c, i) => `<div class="item" role="button" tabindex="0" ${actAttr("cluster", i)}><div class="mid"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.ags.slice(0, 4).join(", "))}${c.ags.length > 4 ? ` y ${c.ags.length - 4} más` : ""}</div></div><span class="muted small">${c.ags.length}</span></div>`).join("") +
+    `<div class="row" style="margin-top:14px"><button class="btn ghost" data-go="#/settings">Ajustes de conexión</button></div>`);
+}
+
+/* ---- ajustes y diagnóstico ---- */
+function refreshHint(v) {
+  v = +v;
+  if (!(v > 0)) return "";
+  if (v < 10) return `⚠️ ${v} s es muy seguido: el servidor actualiza las posiciones cada ~30 s, así que no vas a ver datos más nuevos, solo más pedidos (y más chance de que bloqueen la clave). Se permite igual.`;
+  if (v < 15) return "Ojo: por debajo de ~15 s casi siempre llega el mismo dato. El movimiento fluido lo da la interpolación.";
+  return "";
+}
+function openSettings() {
+  S.view = { type: "settings" }; setSheet("max");
+  const st = S.settings;
+  head(`<button class="iconbtn" ${actAttr("back")} aria-label="Volver">${backSvg}</button><h2>Ajustes <span class="sub">· v${APP_VER}</span></h2>`);
+  body(`
+    <label class="f" for="sRef">Refresco en la parada (segundos)</label><input id="sRef" type="number" min="1" max="600" step="1" inputmode="numeric" value="${esc(st.refresh)}"><div class="hint" id="hRef"></div>
+    <label class="f" for="sRRef">Refresco en la vista de línea (segundos)</label><input id="sRRef" type="number" min="1" max="600" step="1" inputmode="numeric" value="${esc(st.routeRefresh)}"><div class="hint" id="hRRef"></div>
+    <label class="chk"><input id="sInterp" type="checkbox" ${st.interp ? "checked" : ""}> Mover los bondis entre consultas (interpolación)</label>
+    <div class="small muted" style="margin:2px 2px 0">Estima la posición con la velocidad de los últimos fixes, sobre el recorrido, hasta 30 s. El bondi se ve más claro y con borde punteado cuando la posición es estimada.</div>
+    <label class="chk"><input id="sModel" type="checkbox" ${st.useModel !== false ? "checked" : ""}> Usar lo aprendido con “Estoy en este bondi”</label>
+    <div class="sec">Entrenamiento del interpolado</div>
+    <div class="small muted" style="margin:0 2px 6px">Arriba del bondi, tocá la unidad (en la parada o en el mapa de la línea) y elegí <b>🚌 Estoy en este bondi</b>. La app compara el GPS del celu con el del bondi y aprende la velocidad por tramo y el atraso típico del feed. <b>Todo queda solo en este dispositivo; no se sube a ningún servidor.</b></div>
+    <div id="trainStats"></div>
+    <div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn ghost" ${actAttr("trainExport")}>Exportar (JSON)</button><button class="btn ghost" ${actAttr("trainClear")}>Borrar lo aprendido</button></div>
+    <label class="f" for="sBase">Servidor OneBusAway (API “where”)</label><input id="sBase" value="${esc(st.base)}" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label class="f" for="sKey">Clave de API</label><input id="sKey" value="${esc(st.key)}" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="small muted" style="margin:4px 2px 0">Cabecera que se manda: <span class="mono">Authorization: ${AUTH_SCHEME} …${esc(String(st.key).slice(-12))}</span> (formato fijo, verificado 30/10/2026).</div>
+    <label class="f" for="sMode">Modo de conexión</label>
+    <select id="sMode">
+      <option value="auto">Automático (directo → proxy → JSONP)</option>
+      <option value="fetch">Directo (CORS)</option><option value="proxy">Solo proxy</option><option value="jsonp">JSONP (sin cabecera)</option>
+    </select>
+    <label class="f" for="sProxy">Proxy (si el servidor bloquea al navegador)</label><input id="sProxy" value="${esc(st.proxy)}" placeholder="/bondimetro/proxy" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label class="f" for="sGrid">Web de horarios (grilla Mi Bus, plan B sin datos en vivo)</label><input id="sGrid" value="${esc(st.grid)}" placeholder="/bondi/" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="row" style="margin-top:14px;flex-wrap:wrap">
+      <button class="btn" ${actAttr("save")}>Guardar</button>
+      <button class="btn ghost" ${actAttr("test")}>Probar conexión</button>
+      <button class="btn ghost" ${actAttr("reset")}>Valores de fábrica</button>
+    </div>
+    <div id="diag" aria-live="polite"></div>
+    <div class="note small" style="margin-top:16px">Datos: servidor OneBusAway de Cuándo SUBO (SUBE / Nación Servicios). App personal, sin afiliación oficial. Mapa © OpenStreetMap; alternativa Esri (Powered by Esri).</div>`);
+  $("#sMode").value = st.mode; renderTrainStats();
+  for (const [i, h] of [["sRef", "hRef"], ["sRRef", "hRRef"]]) { const upd = () => { $("#" + h).textContent = refreshHint($("#" + i).value); }; $("#" + i).addEventListener("input", upd); upd(); }
+}
+function saveSettings() {
+  const st = S.settings;
+  const num = (id, def) => { const v = Math.round(+$(id).value); return v >= 1 ? Math.min(600, v) : def; };
+  st.base = $("#sBase").value.trim() || DEFAULTS.base; st.key = $("#sKey").value.trim() || DEFAULTS.key;
+  st.mode = $("#sMode").value; st.proxy = $("#sProxy").value.trim(); st.grid = $("#sGrid").value.trim();
+  st.refresh = num("#sRef", DEFAULTS.refresh); st.routeRefresh = num("#sRRef", DEFAULTS.routeRefresh);
+  st.interp = $("#sInterp").checked; st.useModel = $("#sModel").checked;
+  $("#sRef").value = st.refresh; $("#sRRef").value = st.routeRefresh;
+  ls("settings", st); S.transport = null; for (const k in URL_OVERRIDES) delete URL_OVERRIDES[k];
+  toast("Ajustes guardados");
+}
+async function testConn() {
+  saveSettings();
+  const d = $("#diag"); d.innerHTML = `<div class="note"><span class="spin"></span> Probando…</div>`;
+  const lines = []; const t0 = performance.now();
+  try {
+    const r = await api("current-time");
+    lines.push(`✅ Servidor responde por <b>${esc(S.transport || S.settings.mode)}</b> en ${Math.round(performance.now() - t0)} ms`);
+    lines.push(S.clockBad ? "⚠️ La hora del servidor difiere más de 10 min de la del teléfono" : `Desfase de reloj del teléfono: ${Math.round(S.skew / 1000)} s (se corrige solo)`);
+    if (r.version) lines.push(`Versión de API: ${esc(r.version)}`);
+  } catch (e) { lines.push("❌ " + errMsg(e)); d.innerHTML = `<div class="note err">${lines.join("<br>")}</div>`; return; }
+  try {
+    const c = map.getCenter();
+    const r = await api("stops-for-location", { lat: r3(c.lat), lon: r3(c.lng), radius: 800, maxCount: 5 });
+    lines.push(`✅ Paradas cerca del mapa: ${(r.data.list || []).length}${r.data.outOfRange ? " (fuera de cobertura)" : ""}`);
+  } catch (e) { lines.push("⚠️ Paradas: " + errMsg(e)); }
+  d.innerHTML = `<div class="note">${lines.join("<br>")}</div>`;
+}
+
+/* ----------------------------- arranque -------------------------- */
+// Hook para pruebas (solo lectura del estado).
+window.__b2 = { S, P, Track, estimate, isStale, DEFAULTS, AUTH_SCHEME, authHeader, map, TR, TM, TRAIN, segAt, modelSpeed, lagMs, pointAt, project, trainStart, trainEnd, trainOnPhone, trainOnObaFix, trainStats };
+(async function boot() {
+  // Sesión de entrenamiento que quedó abierta (recarga de la página): se retoma si tiene < 3 h.
+  const ts = ls("trainSession");
+  if (ts && ts.sid && Date.now() - ts.t0 < TRAIN.MAX_AGE_MS) { TR.session = ts; ensureRoutePoly(ts.routeId, true); trainWatch(); renderTrainBar(); }
+  else if (ts) localStorage.removeItem(NS + "trainSession");
+  route();
+  loadMapStops();
+  // GPS: solo si el usuario ya lo había activado y el permiso ya está dado (no aparece ningún cartel).
+  if (ls("gps") && navigator.permissions && navigator.permissions.query) {
+    try { const p = await navigator.permissions.query({ name: "geolocation" }); if (p.state === "granted") startGps(false); } catch (e) {}
+  }
+  loadAgencies().then(() => { if (S.view && S.view.type === "home") renderHome(); });
+  const secure = location.protocol === "https:" || location.hostname === "localhost";
+  if ("serviceWorker" in navigator && secure && !IN_APP) navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW:", e));
+  if (/github\.io$/i.test(location.hostname)) {
+    const n = document.getElementById("hostNote");
+    if (n) {
+      n.hidden = false;
+      n.innerHTML = "Hosteado en GitHub Pages (sin proxy de Daqui). Si no cargan los bondis, en Ajustes probá modo <b>JSONP</b>. Tochá para cerrar.";
+      n.onclick = () => { n.hidden = true; };
+    }
+  }
+})();
+</script>
+</body>
+</html>
