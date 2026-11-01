@@ -3,6 +3,44 @@
 Versión nueva del Bondímetro, en paralelo a la v1 (`/workspace/bondimetro/public/`, que **no se tocó**).
 Es de uso personal. Sigue siendo una PWA estática: un solo `index.html`, Leaflet local en `vendor/`, `sw.js` y el manifest.
 
+## Novedades 2.3.0
+
+- **El mapa se puede rotar.**
+  - En el celu se gira con dos dedos. El giro arranca recién pasados 12°, así no se confunde con el pellizco.
+  - En la compu se gira con **Shift + arrastrar** o con los botones ⟲ ⟳ (15° por toque), que solo aparecen
+    con mouse o trackpad.
+  - La **brújula** muestra hacia dónde queda el norte. Al tocarla, el mapa **vuelve al norte**.
+  - **Rumbo arriba** (opcional, apagado por defecto: Ajustes → "Brújula: permitir rumbo arriba"):
+    - Con el mapa al norte, tocar la brújula hace que el mapa siga hacia dónde mirás.
+    - Usa la brújula del teléfono y, si no hay, el rumbo del GPS mientras te movés a más de 1,5 m/s.
+    - Tocar la brújula otra vez lo apaga y vuelve al norte.
+  - Los bondis y las flechas de sentido de las paradas siguen apuntando bien. Los números, las etiquetas y
+    los tooltips se contra-rotan para que se lean derechos.
+  - "Mi ubicación", "Encuadrar bondis", la hoja inferior y el zoom/pan con pellizco funcionan igual con el
+    mapa rotado.
+  - **No se usó leaflet-rotate.** Es GPL-3.0 (obligaría a licenciar toda la app así) y parchea muchas
+    partes internas de Leaflet. En su lugar hay código propio sin dependencias, `maprot.js` (~200 líneas).
+    Con ángulo 0 no cambia nada; con otro ángulo, rota el contenedor con CSS y corrige las coordenadas de
+    los toques.
+- **Modelo del servidor (aprendido solo)** — ver `/workspace/bondimetro-autotrain/`.
+  - La app baja `model.json` (misma carpeta, `/bondimetro-v2/model.json`) al abrir y cada 6 h, y revalida
+    por ETag.
+  - El modelo sabe la velocidad típica por **tramo de calle × franja horaria × tipo de día**, cuánto se
+    detienen los bondis en cada **parada**, y dónde hay **"demoras habituales"**. Una demora habitual es un
+    lugar donde los bondis suelen quedarse quietos fuera de parada; **no es un semáforo confirmado**.
+  - Se usa para interpolar entre lecturas. El bondi espera en paradas y demoras, y nunca pasa la parada
+    siguiente.
+  - **Lo que entrenaste vos en el celu manda** en esos tramos. El modelo del servidor es el punto de partida
+    en el resto.
+  - Si no hay modelo (404), falla la red o CORS lo bloquea, la app sigue igual que en la 2.2.
+  - En Ajustes se ven la versión, la fecha, los días de datos, el error medio contra "sin modelo" y las
+    demoras habituales, y hay un interruptor para no usarlo.
+- **Service worker** `bondimetro2-shell-5`. Agrega `maprot.js` y `srvmodel.js` al shell. **No** guarda
+  `model.json` ni la API.
+
+Capturas (390×844): `screenshots/v23-rot-0.png`, `v23-rot-90.png`, `v23-rot-180.png`, `v23-rot-90-mi-ubicacion.png`,
+`v23-ajustes-modelo-servidor.png`.
+
 ## Novedades 2.2.0
 
 - **Mapa en vivo (inicio).** Te centra y muestra **todos los bondis que están circulando** (de `vehicles-for-agency`), con chips por línea, un radio de 500 m y la lista "Más cercanos a vos".
@@ -106,7 +144,7 @@ La idea: si vas arriba de un bondi, el GPS de tu celu es más rápido y preciso 
 **Límites**
 - Necesita la pantalla prendida.
 - El tramo depende de que la línea tenga paradas por sentido en `stops-for-route`.
-- La velocidad aprendida no distingue horario (hora pico vs. noche). Se puede agregar después: los pares guardan el timestamp.
+- La velocidad aprendida en el celu no distingue horario (hora pico vs. noche). El modelo del servidor sí lo hace (2.3.0).
 
 ## Cómo servirla
 
@@ -116,16 +154,24 @@ Es estática, así que alcanza con servir `public/` bajo `/bondimetro-v2/`. Por 
 location /bondimetro-v2/ { alias /ruta/a/bondimetro-v2/public/; }
 ```
 
+`model.json` y `metrics.json` (opcionales) van en la misma carpeta pública, o en un `location =` propio. Ver
+`/workspace/bondimetro-autotrain/INSTALL.md`.
+
 El proxy sigue siendo el de la v1 (`/bondimetro/proxy/<path>.json?...&h=<Authorization>`), configurable en Ajustes.
 Dentro de la app Android (UA `BondimetroApp`) usa el puente nativo `/oba`.
 
 ## Cómo probar (local, sin SUBE)
 
 ```bash
-cd /workspace/bondimetro-v2/test
-node server.js &     # mock en http://localhost:8766/bondimetro-v2/ (proxy y /api/where simulados)
-node test.js         # 83 pruebas en Chrome headless; todo DNS salvo localhost bloqueado
-node shots.js        # capturas 390x844 con teselas reales de OSM
+cd /workspace/bondimetro-v2.3/test
+node server.js &           # mock en http://localhost:8766/bondimetro-v2/ (proxy y /api/where simulados)
+node test.js               # 83 pruebas en Chrome headless; todo DNS salvo localhost bloqueado
+node rot.js                # 38 pruebas de rotación + capturas v23-rot-*.png
+PORT=8767 node server.js & # (segunda instancia para srv.js)
+PORT=8767 node srv.js      # 21 pruebas del modelo del servidor (404, CORS, schema malo, espera en parada, local manda)
+python3 /workspace/bondimetro-autotrain/tests/gen_parity.py /tmp/parity.json
+node parity.js /tmp/parity.json   # paridad JS↔Python del predictor (1204 comprobaciones)
+node shots.js              # capturas 390x844 con teselas reales de OSM
 ```
 
 - El mock tiene la línea 20 (5 unidades, una detenida), la 21 (ida y vuelta, 4 unidades, dos en el mismo viaje) y la 50 (50A/B/C), más una unidad estacionada y otra sin reportar hace 2 h.

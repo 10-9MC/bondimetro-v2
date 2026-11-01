@@ -137,7 +137,7 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
 .busmk{width:46px;height:46px;position:relative}
 .busmk .rot{position:absolute;inset:0;transform-origin:50% 50%}
 .busmk svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
-.busmk .lb{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:20px;height:16px;padding:0 3px;border-radius:5px;background:var(--mc,#0f766e);color:#fff;border:1.5px solid #fff;font:800 10.5px/13px system-ui,-apple-system,sans-serif;text-align:center;white-space:nowrap;letter-spacing:-.02em}
+.busmk .lb{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(calc(-1 * var(--mrot,0deg)));min-width:20px;height:16px;padding:0 3px;border-radius:5px;background:var(--mc,#0f766e);color:#fff;border:1.5px solid #fff;font:800 10.5px/13px system-ui,-apple-system,sans-serif;text-align:center;white-space:nowrap;letter-spacing:-.02em}
 .busmk.old .rot,.busmk.old .lb{opacity:.55}
 .stopmk{position:relative;width:100%;height:100%}
 .stopmk .sd{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#fff;border:2.5px solid var(--sc,#0f766e)}
@@ -149,6 +149,20 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
 .leaflet-control-attribution{font-size:10px!important}
 .darktiles{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.6)}
 .leaflet-bottom{bottom:var(--sheetH,42vh)}
+/* v2.3: rotación del mapa (maprot.js). El texto que vive en la capa rotada se contra-rota con --mrot. */
+#attr{position:fixed;right:0;bottom:var(--sheetH,42vh);z-index:500;background:none;overflow:visible;font-size:10px}
+:root.maprot .leaflet-tooltip{background:none;border:0;box-shadow:none;padding:0}
+:root.maprot .leaflet-tooltip:before{display:none}
+:root.maprot .ttx{display:inline-block;transform:rotate(calc(-1 * var(--mrot)));background:#fff;color:#222;border-radius:4px;padding:6px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+#mapCtl{position:fixed;right:10px;bottom:calc(var(--sheetH,42vh) + 26px);z-index:650;display:flex;flex-direction:column;gap:8px;align-items:center}
+.fab.sm{width:40px;height:40px;border-radius:20px}
+.rotb{display:none!important}
+@media (hover:hover) and (pointer:fine){.rotb{display:grid!important}}
+:root.finep .rotb{display:grid!important}
+#btnNorth svg{transition:transform .08s linear}
+#btnNorth.follow{color:var(--acc);box-shadow:0 0 0 2.5px var(--acc),0 2px 10px rgba(0,0,0,.2)}
+#btnNorth .nlab{position:absolute;font:800 9px/1 system-ui,sans-serif;bottom:-13px;left:50%;transform:translateX(-50%);background:var(--bg);border-radius:4px;padding:1px 3px;white-space:nowrap}
+#btnNorth{position:relative}
 .hidden{display:none!important}
 #toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--st) + 66px);z-index:900;background:#111827;color:#fff;padding:9px 14px;border-radius:12px;font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
 #toast.show{opacity:.95}
@@ -183,12 +197,18 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
 @media (prefers-reduced-motion:reduce){
   .dot,.spin{animation:none}
-  #sheet,#toast,.busmk{transition:none}
+  #sheet,#toast,.busmk,#btnNorth svg{transition:none}
 }
 </style>
 </head>
 <body>
 <div id="map" role="application" aria-label="Mapa"></div>
+<div id="attr" class="leaflet-container"></div>
+<div id="mapCtl">
+  <button class="fab sm rotb" id="btnRotL" type="button" title="Girar el mapa a la izquierda (o Shift + arrastrar)" aria-label="Girar el mapa a la izquierda"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 3v5h5"/></svg></button>
+  <button class="fab sm rotb" id="btnRotR" type="button" title="Girar el mapa a la derecha (o Shift + arrastrar)" aria-label="Girar el mapa a la derecha"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 3v5h-5"/></svg></button>
+  <button class="fab sm" id="btnNorth" type="button" title="Brújula: norte arriba" aria-label="Brújula: norte arriba"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2 L17 13 L9 13 Z" fill="#dc2626"/><path d="M13 24 L9 13 L17 13 Z" fill="currentColor" opacity=".45"/><text x="13" y="10.5" text-anchor="middle" font-size="6" font-weight="800" fill="#fff" font-family="system-ui,sans-serif">N</text></svg><span class="nlab" hidden></span></button>
+</div>
 
 <div id="top">
   <div id="searchBox">
@@ -215,13 +235,15 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
 <div id="hostNote" role="note" hidden><span class="tx"></span><button class="x" type="button" aria-label="Cerrar aviso">✕ Cerrar</button></div>
 
 <script src="vendor/leaflet.js"></script>
+<script src="maprot.js"></script>
+<script src="srvmodel.js"></script>
 <script>
 "use strict";
 /* ================================================================
    Bondímetro v2 — cliente OneBusAway para el backend de Cuándo SUBO
    Cambios vs v1: ver README.md / CHANGELOG.md.
    ================================================================ */
-const APP_VER = "2.2.0";
+const APP_VER = "2.3.0";
 const NS = "bondi2.";   // prefijo de localStorage (v1 usa "bondi." en el mismo origen: no pisarlo)
 
 const DEFAULTS = {
@@ -233,7 +255,10 @@ const DEFAULTS = {
   routeRefresh: 15,             // s entre consultas en la vista de línea (configurable)
   liveRefresh: 20,              // s entre consultas en el mapa en vivo (1 pedido vehicles-for-agency por empresa cercana)
   interp: true,                 // mover los bondis entre consultas (extrapolación)
+  headingUp: false,             // brújula: permitir "rumbo arriba" (el mapa sigue hacia dónde mirás). Apagado por defecto
   useModel: true,               // usar lo aprendido con "Estoy en este bondi" (velocidad por tramo + desfase del feed)
+  useServerModel: true,         // usar el modelo del servidor (autotrain: todas las unidades, por tramo × franja × tipo de día)
+  serverModel: "model.json",    // relativo a la app: /bondimetro-v2/model.json (si no está → 404 y se sigue sin él)
   grid: "/bondi/"               // web con la grilla oficial de Mi Bus (sin datos en vivo)
 };
 // Autenticación: UN solo formato. Verificado el 30/10/2026 con 2 pedidos reales
@@ -554,7 +579,7 @@ function errBox() {
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) { clearTimeout(P.timer); P.timer = null; P.next = 0; if (P.ctl) P.ctl.abort(); pauseGps(); }
-  else { if (P.fn && !P.stopped) runPoll(); resumeGps(); kickAnim(); }
+  else { if (P.fn && !P.stopped) runPoll(); resumeGps(); kickAnim(); if (typeof smLoad === "function") smLoad(false); }
 });
 
 /* ----------------------------- mapa ------------------------------ */
@@ -575,6 +600,59 @@ function setTiles(i) {
   tiles.on("tileload", () => { tileErr = 0; });
 }
 setTiles(0);
+// Atribución fuera del contenedor rotado (si no, con el mapa girado quedaría torcida o fuera de pantalla).
+$("#attr").appendChild(map.attributionControl.getContainer());
+/* ------------- rotación del mapa (v2.3, maprot.js: código propio, sin dependencias) -------------
+   Dos dedos girando (celu), Shift + arrastrar o ⟲ ⟳ (compu), brújula = volver al norte. Modo "rumbo arriba"
+   opcional (Ajustes, apagado por defecto): con la brújula se alterna norte arriba ↔ rumbo arriba. */
+const MR = MapRot(map, { onChange: updCompass, onManual: () => { if (HD.on) stopFollow(); } });
+const HD = { on: false, h: null, last: 0, compassT: 0, ev: null };
+function cardinal(deg) { return ["N", "NE", "E", "SE", "S", "SO", "O", "NO"][Math.round(((deg % 360) + 360) % 360 / 45) % 8]; }
+function updCompass() {
+  const b = $("#btnNorth"); if (!b) return;
+  const d = MR.get(), up = -d;   // rumbo que queda hacia arriba de la pantalla
+  b.querySelector("svg").style.transform = d ? `rotate(${d}deg)` : "";
+  b.classList.toggle("follow", HD.on);
+  const lab = b.querySelector(".nlab"), txt = HD.on ? "rumbo" : d ? `${Math.round(((up % 360) + 360) % 360)}° ${cardinal(up)}` : "";
+  lab.hidden = !txt; lab.textContent = txt;
+  const al = HD.on ? "Brújula: rumbo arriba (el mapa sigue hacia dónde mirás). Tocá para volver al norte"
+    : d ? `Brújula: arriba queda el ${cardinal(up)} (${Math.round(((up % 360) + 360) % 360)}°). Tocá para volver al norte` : "Brújula: norte arriba";
+  b.setAttribute("aria-label", al); b.title = al;
+}
+const ORI_EV = "ondeviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation";
+function onOrientation(e) {
+  let h = e.webkitCompassHeading;
+  if (h == null) { if (e.alpha == null || (e.type === "deviceorientation" && !e.absolute)) return; h = 360 - e.alpha; }
+  h += (screen.orientation && screen.orientation.angle) || 0;
+  HD.compassT = Date.now(); applyHeading(h);
+}
+function applyHeading(h) {
+  if (!HD.on || !Number.isFinite(h)) return;
+  HD.h = HD.h == null ? h : HD.h + MR.norm(h - HD.h) * 0.35;   // suavizado circular
+  const now = performance.now(), target = -HD.h;
+  if (now - HD.last < 80 || Math.abs(MR.norm(target - MR.get())) < 1.5) return;
+  HD.last = now; MR.set(target);
+}
+async function startFollow() {
+  if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+    try { if (await DeviceOrientationEvent.requestPermission() !== "granted") { toast("Sin permiso de brújula: el mapa queda con el norte arriba"); return; } } catch (e) { /* sigue: puede andar con el rumbo del GPS */ }
+  }
+  HD.on = true; HD.h = null; HD.compassT = 0;
+  addEventListener(ORI_EV, onOrientation, true); updCompass();
+  toast("Rumbo arriba: el mapa gira según hacia dónde mirás");
+  setTimeout(() => { if (HD.on && HD.h == null) toast("No llega dato de brújula: se usa el rumbo del GPS cuando te movés"); }, 3500);
+}
+function stopFollow() { HD.on = false; HD.h = null; removeEventListener(ORI_EV, onOrientation, true); updCompass(); }
+$("#btnNorth").onclick = () => {
+  if (HD.on || MR.get()) { stopFollow(); MR.set(0, { animate: true }); return; }
+  if (S.settings.headingUp) { startFollow(); return; }
+  toast(matchMedia("(pointer: fine)").matches ? "Para girar el mapa: Shift + arrastrar, o los botones ⟲ ⟳" : "Para girar el mapa: girá con dos dedos");
+};
+$("#btnRotL").onclick = () => { if (HD.on) stopFollow(); MR.rotateBy(-15, { animate: true }); };
+$("#btnRotR").onclick = () => { if (HD.on) stopFollow(); MR.rotateBy(15, { animate: true }); };
+// botones de giro sólo con mouse/trackpad (o sin pantalla táctil); en el celu se gira con dos dedos
+if (matchMedia("(any-pointer: fine)").matches || !navigator.maxTouchPoints) document.documentElement.classList.add("finep");
+updCompass();
 map.createPane("selPane").style.zIndex = 450;
 const stopLayer = L.layerGroup().addTo(map);
 const routeLayer = L.layerGroup().addTo(map);
@@ -590,13 +668,13 @@ function topInset() {
 function sheetPad() { return { paddingTopLeft: [30, topInset() + 14], paddingBottomRight: [30, sheetPx() + 20] }; }
 // Centra `ll` en el medio del área visible (no en el medio de la pantalla, que queda tapado por la hoja).
 function centerVisible(ll, z = map.getZoom()) {
-  const off = (sheetPx() - topInset()) / 2;
-  const c = map.unproject(map.project(L.latLng(ll), z).add([0, off]), z);
+  const off = (sheetPx() - topInset()) / 2, v = MR.screenToContainerVec(0, off);   // corrimiento en PANTALLA → contenedor (rotado)
+  const c = map.unproject(map.project(L.latLng(ll), z).add([v[0], v[1]]), z);
   map.setView(c, z, { animate: !REDUCE_MOTION });
 }
 function visibleCenter() {   // punto del mapa en el medio del área visible (referencia "cerca de acá" sin GPS)
-  const sz = map.getSize(), y = (topInset() + sz.y - sheetPx()) / 2;
-  const ll = map.containerPointToLatLng([sz.x / 2, Math.max(0, y)]); return [ll.lat, ll.lng];
+  const y = (topInset() + innerHeight - sheetPx()) / 2;
+  const ll = MR.screenToLatLng(innerWidth / 2, Math.max(0, y)); return [ll.lat, ll.lng];
 }
 /* Bondi con forma de bondi (vista de arriba): cuerpo + flecha al frente, rotados con el rumbo.
    OBA informa la orientación en grados con 0 = Este, sentido antihorario: rotación CSS = 90 − orientación.
@@ -684,12 +762,18 @@ function computeVel(tr) {
   const a = tr.fixes[n - 2], b = tr.fixes[n - 1], dt = (b.t - a.t) / 1000;
   if (dt < 2 || dt > 240) return;
   const pa = [a.lat, a.lon], pb = [b.lat, b.lon], d = dist(pa, pb);
-  if (d < 8) { tr.vel = { speed: 0 }; return; }            // detenido: no mover
+  if (d < 8) {                                               // detenido: no mover (salvo modelo del servidor, ver estimate)
+    tr.stopSince = tr.stopSince != null ? tr.stopSince : a.t;
+    tr.vel = { speed: 0 };
+    if (tr.lastPoly) { const pr = project(tr.lastPoly, pb); if (pr.off < 60) { tr.vel.poly = tr.lastPoly; tr.vel.along = pr.along; tr.vel.sign = 1; } }
+    return;
+  }
+  tr.stopSince = null;
   if (d / dt > 30) return;                                   // salto de GPS: no extrapolar
   const fb = findPoly(tr.meta.routeId, pb, pa);
   if (fb) {
     const pra = project(fb.poly, pa), dAl = fb.pr.along - pra.along;
-    if (pra.off < 60 && Math.abs(dAl) > 5) { tr.vel = { speed: Math.min(MAX_SPEED, Math.abs(dAl) / dt), poly: fb.poly, along: fb.pr.along, sign: Math.sign(dAl) }; return; }
+    if (pra.off < 60 && Math.abs(dAl) > 5) { tr.vel = { speed: Math.min(MAX_SPEED, Math.abs(dAl) / dt), poly: fb.poly, along: fb.pr.along, sign: Math.sign(dAl) }; if (dAl > 0) tr.lastPoly = fb.poly; return; }
   }
   const A = toXY(pa, a.lat), B = toXY(pb, a.lat);
   tr.vel = { speed: Math.min(MAX_SPEED, d / dt), ux: (B[0] - A[0]) / d, uy: (B[1] - A[1]) / d, hd: Math.atan2(B[1] - A[1], B[0] - A[0]) * 180 / Math.PI };
@@ -698,14 +782,30 @@ function computeVel(tr) {
 function estimate(tr, T) {
   const f = tr.fixes[tr.fixes.length - 1], base = { p: [f.lat, f.lon], est: false, moved: 0, hd: null };
   const v = tr.vel;
-  if (!S.settings.interp || !v || !(v.speed > 0) || isStale()) return base;
-  // Modelo aprendido (solo si no es el bondi que se está entrenando ahora: ese se mide "en crudo").
-  const useM = S.settings.useModel !== false && !isTrainTarget(tr.meta);
+  if (!S.settings.interp || !v || isStale()) return base;
+  // Modelos (nunca en el bondi que se está entrenando ahora: ese se mide "en crudo").
+  //  - local ("Estoy en este bondi", este celu): manda en los tramos que entrenaste;
+  //  - servidor (autotrain, todas las unidades): velocidad por tramo × franja × día, paradas y demoras habituales.
+  const notTrain = !isTrainTarget(tr.meta);
+  const useM = S.settings.useModel !== false && notTrain;
+  const srv = S.settings.useServerModel !== false && notTrain && SM.m ? SM.m : null;
+  if (!(v.speed > 0) && !(srv && v.poly)) return base;
   const lag = useM ? lagMs() : 0;                 // el feed fecha el fix ~lag ms más tarde de lo real
   const dt = Math.min(EXTRAP_MAX_S, Math.max(0, (T - f.t + lag) / 1000));
   if (dt < 1) return base;
   let d = v.speed * dt, src = "fix";
-  if (useM && v.poly && v.sign > 0) { const m = modelAdvance(v.poly, v.along, v.speed, dt); if (m.used) { d = m.d; src = "model"; } }
+  const maxA = Number.isFinite(tr.meta.maxAhead) && v.poly ? v.along + Math.max(0, tr.meta.maxAhead) : null;
+  if (!(v.speed > 0)) {
+    // Detenido: si está en una parada o "demora habitual" conocida, arranca cuando se cumple la espera típica.
+    const cell = srv.cell(f.t), line = lineBase(routeOf(tr.meta.routeId)), ctx = srv.stoppedContext(v.poly, v.along, cell, line);
+    if (!ctx || tr.stopSince == null) return base;
+    const r = srv.advance(v.poly, v.along, dt, cell, line, { stoppedAt: ctx, stoppedFor: Math.max(0, (f.t - tr.stopSince) / 1000), maxAhead: maxA });
+    d = r.along - v.along; src = "server";
+  } else if (v.poly && v.sign > 0 && srv && srv.attach(v.poly)) {
+    const local = useM ? (pos => { const sg = segAt(v.poly, pos + 0.01), m = modelSpeed(sg.key); return m ? { v: m.n >= 3 ? m.v : (m.v * m.n + v.speed) / (m.n + 1), a1: sg.a1 } : null; }) : null;
+    const cell = srv.cell(f.t), r = srv.advance(v.poly, v.along, dt, cell, lineBase(routeOf(tr.meta.routeId)), { fallbackV: v.speed, maxAhead: maxA, local });
+    if (r.used || r.local) { d = r.along - v.along; src = r.local ? (r.used ? "mixed" : "model") : "server"; }
+  } else if (useM && v.poly && v.sign > 0) { const m = modelAdvance(v.poly, v.along, v.speed, dt); if (m.used) { d = m.d; src = "model"; } }
   if (Number.isFinite(tr.meta.maxAhead)) d = Math.min(d, Math.max(0, tr.meta.maxAhead));
   if (d < 1) return base;
   if (v.poly) { const q = pointAt(v.poly, v.along + d * v.sign); return { p: q.p, est: true, moved: d, hd: v.sign > 0 ? q.hd : q.hd + 180, src }; }
@@ -788,7 +888,7 @@ function storeRoutePolys(routeId, e) {
   const all = [];
   for (const g of (e && e.stopGroupings) || []) for (const sg of g.stopGroups || []) for (const p of sg.polylines || []) {
     const pp = prepPoly(decodePoly(p.points)); if (!pp) continue;
-    pp.routeId = routeId; pp.stops = [];
+    pp.routeId = routeId; pp.idx = all.length; pp.stops = [];
     for (const sid of sg.stopIds || []) {
       const st = S.stopsCache[sid]; if (!st) continue;
       const pr = project(pp, [st.lat, st.lon]); const last = pp.stops[pp.stops.length - 1];
@@ -796,7 +896,7 @@ function storeRoutePolys(routeId, e) {
     }
     all.push(pp);
   }
-  for (const p of (e && e.polylines) || []) { const pp = prepPoly(decodePoly(p.points)); if (pp) { pp.routeId = routeId; pp.stops = []; all.push(pp); } }
+  for (const p of (e && e.polylines) || []) { const pp = prepPoly(decodePoly(p.points)); if (pp) { pp.routeId = routeId; pp.idx = all.length; pp.stops = []; all.push(pp); } }
   S.routePolys[routeId] = all;
 }
 
@@ -844,6 +944,47 @@ function modelAdvance(poly, along, fallback, dt) {
   }
   return { d: pos - along, used };
 }
+/* -------- modelo del SERVIDOR (bondimetro-autotrain → /bondimetro-v2/model.json) ---------
+   Se baja al abrir y cada 6 h (con ETag: si no cambió, 304 y no se baja de nuevo). Si no existe (404), falla la
+   red o lo bloquea CORS, la app sigue igual que antes (velocidad de los fixes + lo aprendido en este celu).
+   El service worker NO lo guarda (solo la cáscara). Solo tiene posiciones/velocidades de colectivos. */
+const SM = { m: null, st: "off", err: "", t: 0, loading: null };
+async function smLoad(force) {
+  if (S.settings.useServerModel === false) { SM.st = "off"; renderSrvInfo(); return; }
+  if (SM.loading) return SM.loading;
+  if (!force && SM.t && Date.now() - SM.t < 6 * 3600e3) return;
+  SM.loading = (async () => {
+    if (!SM.m) SM.st = "loading"; renderSrvInfo();
+    const ctl = typeof AbortController === "function" ? new AbortController() : null, to = setTimeout(() => ctl && ctl.abort(), 15000);
+    try {
+      const url = new URL(S.settings.serverModel || DEFAULTS.serverModel, location.href).href;
+      const r = await fetch(url, { cache: "no-cache", credentials: "omit", signal: ctl ? ctl.signal : undefined });
+      SM.t = Date.now();
+      if (r.status === 404) { SM.m = null; SM.st = "none"; return; }
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const d = await r.json();
+      try { SM.m = new SrvModel(d); SM.st = "ok"; SM.err = ""; } catch (e) { SM.m = null; SM.st = "bad"; SM.err = e.message; }
+    } catch (e) { SM.t = Date.now(); SM.st = SM.m ? "ok" : "error"; SM.err = e.name === "AbortError" ? "tardó demasiado" : (e.message || String(e)); }
+    finally { clearTimeout(to); SM.loading = null; renderSrvInfo(); }
+  })();
+  return SM.loading;
+}
+function srvInfoHtml() {
+  if (SM.st === "off") return "Apagado: se usa solo la velocidad de los fixes y lo aprendido en este celu.";
+  if (SM.st === "loading") return '<span class="spin"></span> Buscando el modelo del servidor…';
+  if (SM.st === "none") return "Todavía no hay modelo publicado en el servidor. Se sigue sin él.";
+  if (SM.st === "error") return `No se pudo bajar el modelo (${esc(SM.err)}: sin red o bloqueado por el servidor). Se sigue sin él.`;
+  if (SM.st === "bad") return `El modelo del servidor es de otra versión y se ignora (${esc(SM.err)}).`;
+  if (!SM.m) return "";
+  const s = SM.m.summary(), f = ms => new Date(ms).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return `<b>Modelo del servidor</b> · versión <span class="mono">${esc(s.version)}</span>` +
+    (s.created ? ` · generado ${esc(f(s.created))}` : "") +
+    (s.nDays ? ` · ${s.nDays} día${s.nDays === 1 ? "" : "s"} de datos${s.days ? ` (${esc(s.days[0])} → ${esc(s.days[1])})` : ""}` : "") +
+    (s.mae != null ? `<br>Error medio en la prueba: <b>${s.mae.toFixed(0)} m</b>${s.base != null ? ` (sin modelo: ${s.base.toFixed(0)} m)` : ""}${s.n ? ` · ${s.n} predicciones` : ""}` : "") +
+    (s.lines.length ? `<br>Líneas: ${s.lines.map(esc).join(", ")}` : "") + ` · ${s.pieces} tramos · ${s.delays} “demoras habituales”` +
+    `<br><span class="muted">“Demora habitual” = lugar donde los bondis suelen quedarse quietos fuera de una parada (semáforo, giro, cruce); no es un semáforo confirmado. En los tramos que entrenaste en este celu manda lo tuyo.</span>`;
+}
+function renderSrvInfo() { const el = document.getElementById("srvInfo"); if (el) el.innerHTML = srvInfoHtml(); }
 const TR = { session: null, watch: null, prev: null, poly: null, pass: null, hist: [], jumps: 0 };
 // vehicleId: el interno elegido (si se conoce). Si no, se deduce cuando el viaje tiene una sola unidad.
 function trainStart(tripId, routeId, vehicleId) {
@@ -1030,7 +1171,7 @@ function drawStops(list) {
     const m = L.marker([s.lat, s.lon], { icon: stopIcon(s, "#64748b"), zIndexOffset: -200, keyboard: false, title: s.name });
     m.on("click", () => go("#/stop/" + encodeURIComponent(s.id)));
     const dt = stopDirText(s);
-    m.bindTooltip(esc(s.name) + (dt ? "<br>" + dt : ""), { direction: "top", offset: [0, -8] });
+    m.bindTooltip('<span class="ttx">' + esc(s.name) + (dt ? "<br>" + dt : "") + "</span>", { direction: "top", offset: [0, -8] });
     stopLayer.addLayer(m);
   }
 }
@@ -1044,6 +1185,8 @@ function startGps(center = false) {
   if (S.watchId != null) navigator.geolocation.clearWatch(S.watchId);
   S.watchId = navigator.geolocation.watchPosition(p => {
     showMe([p.coords.latitude, p.coords.longitude]);
+    // "rumbo arriba" sin brújula: rumbo del GPS si te estás moviendo (> 1,5 m/s)
+    if (HD.on && Date.now() - HD.compassT > 3000 && Number.isFinite(p.coords.heading) && p.coords.speed > 1.5) applyHeading(p.coords.heading);
     $("#btnLoc").classList.add("on");
     if (first && center) { centerVisible(S.here, (center === "live" || !S.view || S.view.type === "home") ? 15 : Math.max(map.getZoom(), 16)); if (!S.view || S.view.type === "home") renderHome(); }
     first = false;
@@ -1188,7 +1331,7 @@ const ACTIONS = {
   cluster: i => {
     const c = S.clusters[+i]; if (!c) return; const known = CITIES.find(x => x[0] === c.name);
     setSheet("mid");
-    if (known) map.setView([known[1], known[2]], 14); else map.fitBounds(L.latLngBounds(c.pts).pad(0.3));
+    if (known) map.setView([known[1], known[2]], 14); else MR.fitBounds(L.latLngBounds(c.pts).pad(0.3));
     setTimeout(() => go("#/"), 50);
   },
   retry: () => { if (!P.fn) return route(); P.stopped = null; P.errs = 0; S.connErr = null; runPoll(); },
@@ -1461,7 +1604,7 @@ function focusStop(s) {
   selStopMarker = L.marker([s.lat, s.lon], { pane: "selPane", icon: stopIcon(s, "#f59e0b", true), keyboard: false, interactive: false }).addTo(map);
   fitVisible([[s.lat, s.lon]], 16);
 }
-function fitVisible(pts, maxZoom = 16) { map.fitBounds(L.latLngBounds(pts), Object.assign({ maxZoom, animate: !REDUCE_MOTION }, sheetPad())); }
+function fitVisible(pts, maxZoom = 16) { MR.fitBounds(L.latLngBounds(pts), Object.assign({ maxZoom, animate: !REDUCE_MOTION }, sheetPad())); }
 async function loadArrivals(id, signal) {
   const r = await api("arrivals-and-departures-for-stop/" + encodeURIComponent(id), { minutesBefore: 1, minutesAfter: 120 }, signal);
   if (!S.view || S.view.type !== "stop" || S.view.id !== id) return;
@@ -1636,9 +1779,9 @@ function drawRoute(fit) {
     all.push([s.lat, s.lon]);
     const dt = stopDirText(s);
     L.marker([s.lat, s.lon], { icon: stopIcon(s, col), zIndexOffset: -200, keyboard: false })
-      .bindTooltip(esc(s.name) + (dt ? "<br>" + dt : "")).on("click", () => go("#/stop/" + encodeURIComponent(sid))).addTo(routeLayer);
+      .bindTooltip('<span class="ttx">' + esc(s.name) + (dt ? "<br>" + dt : "") + "</span>").on("click", () => go("#/stop/" + encodeURIComponent(sid))).addTo(routeLayer);
   }
-  if (fit && all.length) map.fitBounds(L.latLngBounds(all), Object.assign({ animate: !REDUCE_MOTION }, sheetPad()));
+  if (fit && all.length) MR.fitBounds(L.latLngBounds(all), Object.assign({ animate: !REDUCE_MOTION }, sheetPad()));
 }
 // Un pedido vehicles-for-agency (todas las unidades de la empresa, se filtran las de la línea).
 // Si la empresa no lo publica (404), plan B: trips-for-route por cada routeId de la línea.
@@ -1831,7 +1974,11 @@ function openSettings() {
     <label class="f" for="sLRef">Refresco del mapa en vivo (segundos)</label><input id="sLRef" type="number" min="1" max="600" step="1" inputmode="numeric" value="${esc(st.liveRefresh || DEFAULTS.liveRefresh)}"><div class="hint" id="hLRef"></div>
     <label class="chk"><input id="sInterp" type="checkbox" ${st.interp ? "checked" : ""}> Mover los bondis entre consultas (interpolación)</label>
     <div class="small muted" style="margin:2px 2px 0">Estima la posición con la velocidad de los últimos fixes, sobre el recorrido, hasta 30 s. El bondi se ve más claro y con borde punteado cuando la posición es estimada.</div>
+    <label class="chk"><input id="sHeading" type="checkbox" ${st.headingUp ? "checked" : ""}> Brújula: permitir “rumbo arriba”</label>
+    <div class="small muted" style="margin:2px 2px 0">Con esto prendido, tocar la brújula alterna <b>norte arriba</b> ↔ <b>rumbo arriba</b> (el mapa gira según hacia dónde mira el celu; si no hay brújula, con el rumbo del GPS al moverte). El mapa se gira siempre con dos dedos, o Shift + arrastrar / ⟲ ⟳ en la compu.</div>
     <label class="chk"><input id="sModel" type="checkbox" ${st.useModel !== false ? "checked" : ""}> Usar lo aprendido con “Estoy en este bondi”</label>
+    <label class="chk"><input id="sSrv" type="checkbox" ${st.useServerModel !== false ? "checked" : ""}> Usar el modelo del servidor (aprendido de todas las unidades)</label>
+    <div class="small" id="srvInfo" style="margin:2px 2px 0">${srvInfoHtml()}</div>
     <div class="sec">Entrenamiento del interpolado</div>
     <div class="small muted" style="margin:0 2px 6px">Arriba del bondi, tocá la unidad (en la parada o en el mapa de la línea) y elegí <b>🚌 Estoy en este bondi</b>. La app compara el GPS del celu con el del bondi y aprende la velocidad por tramo y el atraso típico del feed. <b>Todo queda solo en este dispositivo; no se sube a ningún servidor.</b></div>
     <div id="trainStats"></div>
@@ -1862,7 +2009,10 @@ function saveSettings() {
   st.base = $("#sBase").value.trim() || DEFAULTS.base; st.key = $("#sKey").value.trim() || DEFAULTS.key;
   st.mode = $("#sMode").value; st.proxy = $("#sProxy").value.trim(); st.grid = $("#sGrid").value.trim();
   st.refresh = num("#sRef", DEFAULTS.refresh); st.routeRefresh = num("#sRRef", DEFAULTS.routeRefresh); st.liveRefresh = num("#sLRef", DEFAULTS.liveRefresh);
-  st.interp = $("#sInterp").checked; st.useModel = $("#sModel").checked;
+  st.interp = $("#sInterp").checked; st.useModel = $("#sModel").checked; st.headingUp = $("#sHeading").checked;
+  const srvWas = st.useServerModel !== false; st.useServerModel = $("#sSrv").checked;
+  if (st.useServerModel && !srvWas) smLoad(true); else if (!st.useServerModel) { SM.m = null; SM.t = 0; SM.st = "off"; renderSrvInfo(); }
+  if (!st.headingUp && HD.on) stopFollow();
   $("#sRef").value = st.refresh; $("#sRRef").value = st.routeRefresh; $("#sLRef").value = st.liveRefresh;
   ls("settings", st); S.transport = null; for (const k in URL_OVERRIDES) delete URL_OVERRIDES[k];
   toast("Ajustes guardados");
@@ -1887,7 +2037,7 @@ async function testConn() {
 
 /* ----------------------------- arranque -------------------------- */
 // Hook para pruebas (solo lectura del estado).
-window.__b2 = { S, P, Track, trackFor, isTrainTarget, lineBase, lineKey, stopDir, stopDirText, centerVisible, visibleCenter, sheetPx, topInset, setSheet, showHostNote, loadLive,
+window.__b2 = { SM, smLoad, MR, HD, startFollow, stopFollow, applyHeading, updCompass, fitVisible, S, P, Track, trackFor, isTrainTarget, lineBase, lineKey, stopDir, stopDirText, centerVisible, visibleCenter, sheetPx, topInset, setSheet, showHostNote, loadLive,
   get sheetState() { return sheetState; }, estimate, isStale, DEFAULTS, AUTH_SCHEME, authHeader, map, TR, TM, TRAIN, segAt, modelSpeed, lagMs, pointAt, project, trainStart, trainEnd, trainOnPhone, trainOnObaFix, trainStats };
 (async function boot() {
   // Sesión de entrenamiento que quedó abierta (recarga de la página): se retoma si tiene < 3 h.
@@ -1902,6 +2052,7 @@ window.__b2 = { S, P, Track, trackFor, isTrainTarget, lineBase, lineKey, stopDir
     try { const p = await navigator.permissions.query({ name: "geolocation" }); if (p.state === "granted") startGps(false); } catch (e) {}
   }
   loadAgencies().then(() => { if (S.view && S.view.type === "home") renderHome(); });
+  smLoad(true);
   const secure = location.protocol === "https:" || location.hostname === "localhost";
   if ("serviceWorker" in navigator && secure && !IN_APP) navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW:", e));
 })();
