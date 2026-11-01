@@ -1,6 +1,6 @@
 # Bondímetro v2 (GitHub Pages)
 
-Build estático de `/workspace/bondimetro-v2.3/public` (v2.3.0: mapa rotable con brújula, modelo del servidor `model.json` opcional del entrenamiento automático; incluye lo de 2.2.0).
+Build estático de `/workspace/bondimetro-v2.3/public` (v2.3.1: el bondi punteado ya no se queda quieto entre lecturas SUBE —velocidad por mediana, espera en paradas, «sin señal» tras 5 min—; 2.3.0: mapa rotable con brújula, modelo del servidor `model.json` opcional del entrenamiento automático; incluye lo de 2.2.0).
 
 URL: https://10-9MC.github.io/bondimetro-v2/
 

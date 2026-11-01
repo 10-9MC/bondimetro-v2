@@ -4,7 +4,7 @@
 // Ojo: v1 y v2 comparten origen. El SW de v1 borra al activarse todas las cachés que no son
 // la suya; acá solo borramos las nuestras (prefijo PREFIX) para no romper a v1.
 const PREFIX = "bondimetro2-shell-";
-const CACHE = PREFIX + "5";
+const CACHE = PREFIX + "6";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png",
   "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "vendor/leaflet.css", "vendor/leaflet.js", "maprot.js", "srvmodel.js"];
 const SHELL_PATHS = new Set(SHELL.map(p => new URL(p, self.registration.scope).pathname));

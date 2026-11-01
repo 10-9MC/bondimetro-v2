@@ -3,6 +3,19 @@
 Versión nueva del Bondímetro, en paralelo a la v1 (`/workspace/bondimetro/public/`, que **no se tocó**).
 Es de uso personal. Sigue siendo una PWA estática: un solo `index.html`, Leaflet local en `vendor/`, `sw.js` y el manifest.
 
+## Novedades 2.3.1
+
+- **Arreglo: los bondis en punteadito ya no se quedan quietos.** El GPS de Cuándo SUBO llega con ~1 min de
+  atraso. Antes la estimación se cortaba a los 30 s de la hora del GPS, o sea antes de llegar. Ahora sigue
+  avanzando hasta ~1,5 min después de cada lectura nueva:
+  - va a la velocidad reciente (mediana de los últimos fixes) y espera unos segundos en las paradas;
+  - nunca pasa la parada que estás mirando;
+  - al llegar el dato real se corrige sin saltar para atrás.
+- Si una unidad no manda GPS hace más de 5 min, queda **gris con "sin señal"** en vez de moverse.
+- En la vista de parada el bondi se dibuja donde dice el GPS. Antes se dibujaba en la posición "según horario"
+  que también manda el feed.
+- Detalle en `CHANGELOG.md`. Pruebas nuevas: `node interp.js` (18).
+
 ## Novedades 2.3.0
 
 - **El mapa se puede rotar.**
@@ -35,7 +48,7 @@ Es de uso personal. Sigue siendo una PWA estática: un solo `index.html`, Leafle
   - Si no hay modelo (404), falla la red o CORS lo bloquea, la app sigue igual que en la 2.2.
   - En Ajustes se ven la versión, la fecha, los días de datos, el error medio contra "sin modelo" y las
     demoras habituales, y hay un interruptor para no usarlo.
-- **Service worker** `bondimetro2-shell-5`. Agrega `maprot.js` y `srvmodel.js` al shell. **No** guarda
+- **Service worker** `bondimetro2-shell-5` (en la 2.3.1: `-6`). Agrega `maprot.js` y `srvmodel.js` al shell. **No** guarda
   `model.json` ni la API.
 
 Capturas (390×844): `screenshots/v23-rot-0.png`, `v23-rot-90.png`, `v23-rot-180.png`, `v23-rot-90-mi-ubicacion.png`,
@@ -60,10 +73,11 @@ Capturas (390×844): `screenshots/v22-mapa-en-vivo.png`, `v22-linea-21.png`, `v2
 
 - **Bondis fluidos (interpolación).**
   - Cada unidad tiene un marcador fijo identificado por su interno (`vehicleId`, o `tripId` si no viene). Se mueve, no se borra y se vuelve a crear.
-  - Con cada posición GPS nueva, el marcador se desliza en unos 1 s. Si el salto pasa de 2 km, salta directo. Con `prefers-reduced-motion`, no hay animación.
+  - Con cada posición GPS nueva, el marcador se desliza en unos 1,5 s (2.3.1). Si la nueva estimación queda un poco atrás (< 300 m), espera ahí en vez de retroceder. Si el salto pasa de 2 km, salta directo. Con `prefers-reduced-motion`, no hay animación.
 - **Estimación entre consultas.**
-  - Con las dos últimas posiciones, se calcula la velocidad sobre la polilínea del recorrido, o en línea recta si no hay polilínea.
-  - Se extrapola hasta 30 s como máximo y nunca más allá de la parada.
+  - El sentido sale de las dos últimas posiciones. La velocidad (2.3.1) es la mediana de los tramos en marcha recientes, sobre la polilínea del recorrido o en línea recta si no hay polilínea. Sin modelo espera 7 s en cada parada.
+  - Se extrapola hasta ~90 s después de recibir cada lectura nueva, más el atraso con que llegó el fix (hasta 120 s). Tope de 1500 m y nunca más allá de la parada consultada. Antes de la 2.3.1 eran 30 s desde la hora del fix, que con el atraso real de Cuándo SUBO dejaba el bondi quieto.
+  - Si el GPS tiene más de 5 min, el bondi queda gris con "sin señal" (`.nosig`) y no se mueve.
   - Si el bondi se movió menos de 8 m, se toma como detenido y no se mueve.
   - Cuando la posición es estimada, el marcador se ve semitransparente (`.est`).
   - La distancia se muestra con "≈".
@@ -131,7 +145,7 @@ La idea: si vas arriba de un bondi, el GPS de tu celu es más rápido y preciso 
 - Fuera de la sesión (y para cualquier otro bondi de la línea), la extrapolación avanza cada tramo con su velocidad aprendida y suma el desfase típico del feed.
   - Con menos de 3 pasadas, la velocidad aprendida se mezcla con la de los fixes.
   - El desfase es la mediana de al menos 3 muestras, acotada a −30…+60 s.
-- Sigue el tope de 30 s y el marcador semitransparente de "estimado".
+- Sigue el tope de la extrapolación (desde la 2.3.1, medido desde la lectura nueva) y el marcador semitransparente de "estimado".
 - Sin datos, funciona igual que la 2.0. Se apaga en Ajustes → "Usar lo aprendido con “Estoy en este bondi”".
 - El bondi que estás entrenando se muestra "en crudo", sin modelo, para no contaminar la medición.
 
@@ -169,6 +183,7 @@ node test.js               # 83 pruebas en Chrome headless; todo DNS salvo local
 node rot.js                # 38 pruebas de rotación + capturas v23-rot-*.png
 PORT=8767 node server.js & # (segunda instancia para srv.js)
 PORT=8767 node srv.js      # 21 pruebas del modelo del servidor (404, CORS, schema malo, espera en parada, local manda)
+PORT=8767 node interp.js   # 18 pruebas del interpolado con el feed real (fix con ~1 min de atraso, modo `sube` del mock)
 python3 /workspace/bondimetro-autotrain/tests/gen_parity.py /tmp/parity.json
 node parity.js /tmp/parity.json   # paridad JS↔Python del predictor (1204 comprobaciones)
 node shots.js              # capturas 390x844 con teselas reales de OSM

@@ -175,6 +175,8 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
 .busmk.est .rot{opacity:.62}
 .busmk.est .lb{border-style:dashed}
 .busmk.stop .arw{opacity:.4}
+.busmk.nosig .rot,.busmk.nosig .lb{opacity:.45;filter:grayscale(1)}
+.busmk.nosig::after{content:"sin señal";position:absolute;left:50%;top:100%;transform:translate(-50%,2px);padding:0 4px;border-radius:4px;background:rgba(55,65,81,.85);color:#fff;font:700 9.5px/13px system-ui,-apple-system,sans-serif;white-space:nowrap;pointer-events:none}
 .chip.ln{gap:5px}
 .chip.ln i{font-style:normal;display:inline-block;min-width:22px;padding:0 4px;border-radius:5px;background:var(--lc,#475569);color:#fff;font-weight:800;text-align:center}
 .chip.ln.on{background:var(--lc,#475569);border-color:var(--lc,#475569);color:#fff}
@@ -243,7 +245,7 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
    Bondímetro v2 — cliente OneBusAway para el backend de Cuándo SUBO
    Cambios vs v1: ver README.md / CHANGELOG.md.
    ================================================================ */
-const APP_VER = "2.3.0";
+const APP_VER = "2.3.1";
 const NS = "bondi2.";   // prefijo de localStorage (v1 usa "bondi." en el mismo origen: no pisarlo)
 
 const DEFAULTS = {
@@ -266,8 +268,15 @@ const DEFAULTS = {
 //   Authorization: apiKey <clave>   (+ ?key=<clave> en la URL, como OneBusAway estándar)
 const AUTH_SCHEME = "apiKey";
 const FALLBACK_CENTER = [-41.1335, -71.3103]; // Centro Cívico, Bariloche
-const EXTRAP_MAX_S = 30;      // tope de extrapolación desde el último fix GPS
-const ANIM_MS = 1000;         // animación al llegar un fix nuevo
+// Extrapolación (2.3.1). El feed real de Cuándo SUBO trae el fix GPS con ~50–90 s de atraso (lastUpdateTime;
+// lastLocationUpdateTime viene en 0) y uno nuevo cada ~60 s. Antes el tope era 30 s DESDE EL FIX: como el fix ya
+// llegaba con > 30 s, el punteado quedaba clavado hasta el fix siguiente y después saltaba.
+const EXTRAP_RX_S = 90;       // s que se sigue extrapolando desde que LLEGÓ la última lectura nueva (≈ 1 fix + 1 consulta)
+const EXTRAP_RX_AGE = 120;    // s: atraso máximo del fix al llegar que se "recupera" extrapolando
+const EXTRAP_MAX_M = 1500;    // m: tope de distancia extrapolada
+const NOSIG_S = 300;          // s sin fix nuevo (desde la hora del GPS): "sin señal", no se mueve
+const DWELL_S = 7;            // s de espera por parada cuando no hay modelo
+const ANIM_MS = 1500;         // corrección suave al llegar un fix nuevo
 const MAX_SPEED = 22;         // m/s (~80 km/h): tope para la extrapolación
 const REDUCE_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const LIVE_MAX_AGE = 30 * 60000;   // unidades sin reportar hace > 30 min: guardadas / fuera de servicio (no se muestran)
@@ -741,8 +750,29 @@ function addFix(tr, lat, lon, t) {
   const last = tr.fixes[tr.fixes.length - 1];
   if (last && t < last.t) return false;
   if (last && last.t === t && last.lat === lat && last.lon === lon) return false;
-  tr.fixes.push({ lat, lon, t }); if (tr.fixes.length > 3) tr.fixes.shift();
+  if (last && last.t === t) tr.fixes[tr.fixes.length - 1] = { lat, lon, t };   // misma hora, otra posición: corrige (no dt = 0)
+  else { tr.fixes.push({ lat, lon, t }); if (tr.fixes.length > 6) tr.fixes.shift(); }
+  tr.rx = now();                                  // cuándo llegó la última lectura NUEVA (el tope se mide desde acá)
   computeVel(tr); return true;
+}
+// Velocidad efectiva de un tramo entre dos fixes (sobre la polilínea si se puede) + paradas cruzadas (k).
+function segSpeed(poly, a, b) {
+  const dt = (b.t - a.t) / 1000; if (dt < 2 || dt > 240) return null;
+  const pa = [a.lat, a.lon], pb = [b.lat, b.lon], d = dist(pa, pb);
+  if (d < 8 || d / dt > 30) return null;                     // detenido o salto de GPS: no es muestra de marcha
+  if (poly) {
+    const ra = project(poly, pa), rb = project(poly, pb);
+    if (ra.off < 60 && rb.off < 60 && rb.along - ra.along > 5) {
+      const k = (poly.stops || []).filter(s => s.along > ra.along && s.along <= rb.along).length;
+      return { eff: (rb.along - ra.along) / dt, dt, k };
+    }
+  }
+  return { eff: d / dt, dt, k: 0 };
+}
+// Velocidad típica de la línea ahora (mediana de las otras unidades en marcha) o ~20 km/h.
+function lineSpeed(routeId, self) {
+  const v = []; for (const tr of Track.values()) if (tr !== self && tr.meta && tr.meta.routeId === routeId && tr.vel && tr.vel.n >= 2) v.push(tr.vel.speed);
+  return v.length >= 2 ? median(v) : TYPICAL_SPEED;
 }
 // Polilínea de la línea más cercana a p (<60 m). Con `prev`, prefiere la que se recorre hacia adelante
 // (ida y vuelta suelen compartir calles: así se elige el sentido correcto y sus paradas).
@@ -770,17 +800,48 @@ function computeVel(tr) {
   }
   tr.stopSince = null;
   if (d / dt > 30) return;                                   // salto de GPS: no extrapolar
+  // Sentido y punto de partida: el último par. Velocidad: mediana de los tramos en marcha recientes (≤ 4, ≤ 10 min).
   const fb = findPoly(tr.meta.routeId, pb, pa);
+  let vel = null;
   if (fb) {
     const pra = project(fb.poly, pa), dAl = fb.pr.along - pra.along;
-    if (pra.off < 60 && Math.abs(dAl) > 5) { tr.vel = { speed: Math.min(MAX_SPEED, Math.abs(dAl) / dt), poly: fb.poly, along: fb.pr.along, sign: Math.sign(dAl) }; if (dAl > 0) tr.lastPoly = fb.poly; return; }
+    if (pra.off < 60 && Math.abs(dAl) > 5) { vel = { poly: fb.poly, along: fb.pr.along, sign: Math.sign(dAl) }; if (dAl > 0) tr.lastPoly = fb.poly; }
   }
-  const A = toXY(pa, a.lat), B = toXY(pb, a.lat);
-  tr.vel = { speed: Math.min(MAX_SPEED, d / dt), ux: (B[0] - A[0]) / d, uy: (B[1] - A[1]) / d, hd: Math.atan2(B[1] - A[1], B[0] - A[0]) * 180 / Math.PI };
+  if (!vel) { const A = toXY(pa, a.lat), B = toXY(pb, a.lat); vel = { ux: (B[0] - A[0]) / d, uy: (B[1] - A[1]) / d, hd: Math.atan2(B[1] - A[1], B[0] - A[0]) * 180 / Math.PI }; }
+  const effs = [], sp = vel.sign > 0 ? vel.poly : null; let T = 0, K = 0;
+  for (let i = n - 1; i > 0 && effs.length < 4; i--) {
+    if (b.t - tr.fixes[i - 1].t > 600000) break;
+    const s = segSpeed(sp, tr.fixes[i - 1], tr.fixes[i]); if (s) { effs.push(s.eff); T += s.dt; K += s.k; }
+  }
+  if (!effs.length) return;
+  let eff = median(effs);
+  if (effs.length === 1) {                                   // una sola muestra: se acota alrededor de la típica de la línea
+    const ref = lineSpeed(tr.meta.routeId, tr); eff = Math.min(ref * 2.2, Math.max(ref * 0.4, eff));
+  }
+  // Velocidad de MARCHA = efectiva × tiempo / (tiempo − DWELL_S por parada cruzada en esos tramos): al extrapolar
+  // se vuelve a esperar DWELL_S en cada parada, así en promedio da la misma velocidad efectiva (sin contar 2 veces).
+  const run = sp ? eff * T / Math.max(T * 0.5, T - K * DWELL_S) : eff;
+  vel.speed = Math.min(MAX_SPEED, Math.max(1.5, run)); vel.eff = Math.min(MAX_SPEED, Math.max(1, eff)); vel.n = effs.length;
+  tr.vel = vel;
 }
-// Dónde estaría ahora: último fix + velocidad × tiempo desde el fix (tope 30 s, sin pasar la parada).
+// Avance sin modelo sobre la polilínea: velocidad de marcha + DWELL_S en cada parada que cruza.
+function advanceFix(poly, along, sp, dt) {
+  const st = poly.stops || []; let pos = along, left = dt, j = 0;
+  while (j < st.length && st[j].along <= pos + 1) j++;
+  for (let i = 0; i < 400 && left > 0; i++) {
+    const nx = j < st.length ? st[j].along : Infinity, need = (nx - pos) / sp;
+    if (left <= need) { pos += sp * left; break; }
+    pos = nx; left -= need + DWELL_S; j++;
+  }
+  return Math.min(pos, poly.len) - along;
+}
+// Dónde estaría ahora: último fix + avance desde la hora del fix. El tiempo extrapolado se acota desde que LLEGÓ la
+// última lectura nueva (tr.rx), no desde la hora del GPS (que ya viene con ~1 min de atraso): hasta EXTRAP_RX_S s
+// después de recibirla, + el atraso con que llegó (≤ EXTRAP_RX_AGE). Nunca pasa la parada consultada ni EXTRAP_MAX_M.
+// Sin fix nuevo hace > NOSIG_S s: "sin señal" (se queda en el último GPS).
 function estimate(tr, T) {
   const f = tr.fixes[tr.fixes.length - 1], base = { p: [f.lat, f.lon], est: false, moved: 0, hd: null };
+  if (T - f.t > NOSIG_S * 1000) return Object.assign(base, { nosig: true });
   const v = tr.vel;
   if (!S.settings.interp || !v || isStale()) return base;
   // Modelos (nunca en el bondi que se está entrenando ahora: ese se mide "en crudo").
@@ -791,28 +852,41 @@ function estimate(tr, T) {
   const srv = S.settings.useServerModel !== false && notTrain && SM.m ? SM.m : null;
   if (!(v.speed > 0) && !(srv && v.poly)) return base;
   const lag = useM ? lagMs() : 0;                 // el feed fecha el fix ~lag ms más tarde de lo real
-  const dt = Math.min(EXTRAP_MAX_S, Math.max(0, (T - f.t + lag) / 1000));
+  const rxAge = Math.min(EXTRAP_RX_AGE, Math.max(0, ((tr.rx || T) - f.t) / 1000));
+  const dt = Math.min(rxAge + EXTRAP_RX_S, Math.max(0, (T - f.t + lag) / 1000));
   if (dt < 1) return base;
-  let d = v.speed * dt, src = "fix";
-  const maxA = Number.isFinite(tr.meta.maxAhead) && v.poly ? v.along + Math.max(0, tr.meta.maxAhead) : null;
+  // Tope: la parada consultada (vista de parada, por geometría: 15 m antes) y EXTRAP_MAX_M.
+  let cap = EXTRAP_MAX_M;
+  if (Number.isFinite(tr.meta.maxAhead)) cap = Math.min(cap, Math.max(0, tr.meta.maxAhead));   // tope explícito (m) si lo hay
+  if (tr.meta.stopLL) {
+    if (v.poly) { const ps = project(v.poly, tr.meta.stopLL); if (ps.off < 60) { const ah = (ps.along - v.along) * v.sign; if (ah > -5) cap = Math.min(cap, Math.max(0, ah - 15)); } }
+    else cap = Math.min(cap, Math.max(0, dist([f.lat, f.lon], tr.meta.stopLL) - 15));
+  }
+  let d = (v.eff || v.speed) * dt, src = "fix";
+  const maxA = v.poly ? v.along + cap : null;
   if (!(v.speed > 0)) {
     // Detenido: si está en una parada o "demora habitual" conocida, arranca cuando se cumple la espera típica.
     const cell = srv.cell(f.t), line = lineBase(routeOf(tr.meta.routeId)), ctx = srv.stoppedContext(v.poly, v.along, cell, line);
     if (!ctx || tr.stopSince == null) return base;
     const r = srv.advance(v.poly, v.along, dt, cell, line, { stoppedAt: ctx, stoppedFor: Math.max(0, (f.t - tr.stopSince) / 1000), maxAhead: maxA });
     d = r.along - v.along; src = "server";
-  } else if (v.poly && v.sign > 0 && srv && srv.attach(v.poly)) {
-    const local = useM ? (pos => { const sg = segAt(v.poly, pos + 0.01), m = modelSpeed(sg.key); return m ? { v: m.n >= 3 ? m.v : (m.v * m.n + v.speed) / (m.n + 1), a1: sg.a1 } : null; }) : null;
-    const cell = srv.cell(f.t), r = srv.advance(v.poly, v.along, dt, cell, lineBase(routeOf(tr.meta.routeId)), { fallbackV: v.speed, maxAhead: maxA, local });
-    if (r.used || r.local) { d = r.along - v.along; src = r.local ? (r.used ? "mixed" : "model") : "server"; }
-  } else if (useM && v.poly && v.sign > 0) { const m = modelAdvance(v.poly, v.along, v.speed, dt); if (m.used) { d = m.d; src = "model"; } }
-  if (Number.isFinite(tr.meta.maxAhead)) d = Math.min(d, Math.max(0, tr.meta.maxAhead));
+  } else {
+    let done = false;
+    if (v.poly && v.sign > 0 && srv && srv.attach(v.poly)) {
+      const local = useM ? (pos => { const sg = segAt(v.poly, pos + 0.01), m = modelSpeed(sg.key); return m ? { v: m.n >= 3 ? m.v : (m.v * m.n + v.speed) / (m.n + 1), a1: sg.a1 } : null; }) : null;
+      const cell = srv.cell(f.t), r = srv.advance(v.poly, v.along, dt, cell, lineBase(routeOf(tr.meta.routeId)), { fallbackV: v.speed, maxAhead: maxA, local });
+      if (r.used || r.local) { d = r.along - v.along; src = r.local ? (r.used ? "mixed" : "model") : "server"; done = true; }
+    }
+    if (!done && useM && v.poly && v.sign > 0) { const m = modelAdvance(v.poly, v.along, v.eff || v.speed, dt); if (m.used) { d = m.d; src = "model"; done = true; } }
+    if (!done && v.poly && v.sign > 0) d = advanceFix(v.poly, v.along, v.speed, dt);
+  }
+  d = Math.min(d, cap);
   if (d < 1) return base;
-  if (v.poly) { const q = pointAt(v.poly, v.along + d * v.sign); return { p: q.p, est: true, moved: d, hd: v.sign > 0 ? q.hd : q.hd + 180, src }; }
+  if (v.poly) { const al = v.along + d * v.sign, q = pointAt(v.poly, al); return { p: q.p, est: true, moved: d, hd: v.sign > 0 ? q.hd : q.hd + 180, src, poly: v.poly, along: al, sign: v.sign }; }
   const o = toXY([f.lat, f.lon], f.lat);
   return { p: fromXY(o[0] + v.ux * d, o[1] + v.uy * d, f.lat), est: true, moved: d, hd: v.hd, src };
 }
-// items: [{ id (vehicleId||tripId), tripId, vehicleId, routeId, lat, lon, t, bearing, old, faded, z, tip, label, maxAhead }]
+// items: [{ id (vehicleId||tripId), tripId, vehicleId, routeId, lat, lon, t, bearing, old, faded, z, tip, label, stopLL }]
 function syncBuses(items) {
   const seen = new Set();
   for (const it of items) {
@@ -824,7 +898,9 @@ function syncBuses(items) {
     if (fresh && isTrainTarget(it)) trainOnObaFix(it);
     const e = estimate(tr, now());
     const r = routeOf(it.routeId);
-    const bearing = Number.isFinite(it.bearing) ? it.bearing : (e.hd != null ? e.hd : (tr.vel && tr.vel.hd != null ? tr.vel.hd : NaN));
+    // Rumbo: el del recorrido/GPS primero; `orientation` del feed sale del horario en Cuándo SUBO (último recurso).
+    const vhd = tr.vel && tr.vel.poly ? pointAt(tr.vel.poly, tr.vel.along).hd + (tr.vel.sign < 0 ? 180 : 0) : (tr.vel && tr.vel.hd != null ? tr.vel.hd : null);
+    const bearing = e.hd != null ? e.hd : vhd != null ? vhd : Number.isFinite(it.bearing) ? it.bearing : NaN;
     const key = [routeColor(r), Math.round(bearing / 5), !!it.old, it.label || routeLabel(r)].join("|");
     if (isNew) {
       tr.marker = L.marker(e.p, { icon: busIcon(r, bearing, it.old, it.label), zIndexOffset: it.z || 500, opacity: it.faded ? .5 : 1, keyboard: false });
@@ -836,11 +912,19 @@ function syncBuses(items) {
       tr.marker.setZIndexOffset(it.z || 500); tr.marker.setOpacity(it.faded ? .5 : 1);
       if (fresh) {
         const far = dist(tr.shown, e.p) > 2000;
-        if (REDUCE_MOTION || far) { tr.anim = null; tr.marker.setLatLng(e.p); tr.shown = e.p; }
-        else tr.anim = { from: tr.shown, t0: performance.now() };
+        tr.hold = null;
+        // Corrección sin saltos: si la nueva estimación quedó un poco ATRÁS de lo mostrado (mismo recorrido, < 300 m),
+        // el bondi espera ahí hasta que la estimación lo alcanza (máx. 90 s) en vez de retroceder.
+        if (!far && e.est && e.poly && tr.shown) {
+          const ps = project(e.poly, tr.shown), back = (ps.along - e.along) * e.sign;
+          if (ps.off < 30 && back > 0 && back < 300) tr.hold = { poly: e.poly, along: ps.along, sign: e.sign, until: now() + 90000 };
+        }
+        if (REDUCE_MOTION || far) { tr.anim = null; tr.hold = null; tr.marker.setLatLng(e.p); tr.shown = e.p; }
+        else if (!tr.hold) tr.anim = { from: tr.shown, t0: performance.now() };
+        else tr.anim = null;
       }
     }
-    tr.marker.setTooltipContent(it.tip);
+    tr.marker.setTooltipContent(e.nosig ? it.tip + ` · <b>sin señal</b> (último GPS ${hhmm(tr.fixes[tr.fixes.length - 1].t)})` : it.tip);
     tr.marker._b2faded = !!it.faded;
     tr.last = e;
   }
@@ -853,6 +937,11 @@ function updateMarkers(pt) {
   for (const tr of Track.values()) {
     const e = estimate(tr, T); tr.last = e;
     let p = e.p;
+    if (tr.hold) {
+      const h = tr.hold;
+      if (e.est && e.poly === h.poly && (e.along - h.along) * h.sign < 0 && T < h.until) p = pointAt(h.poly, h.along).p;
+      else { tr.hold = null; if (dist(tr.shown, p) > 1) tr.anim = { from: tr.shown, t0: pt }; }
+    }
     if (tr.anim) {
       const k = Math.min(1, (pt - tr.anim.t0) / ANIM_MS), ease = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
       p = [tr.anim.from[0] + (p[0] - tr.anim.from[0]) * ease, tr.anim.from[1] + (p[1] - tr.anim.from[1]) * ease];
@@ -860,8 +949,8 @@ function updateMarkers(pt) {
     }
     tr.marker.setLatLng(p); tr.shown = p;
     const stopped = !!(tr.vel && tr.vel.speed === 0);
-    const cls = (e.est ? "est" : "") + (stopped ? " stop" : "");
-    if (tr.estShown !== cls) { const el = tr.marker.getElement(); const mk = el && el.querySelector(".busmk"); if (mk) { mk.classList.toggle("est", e.est); mk.classList.toggle("stop", stopped); tr.estShown = cls; } }
+    const cls = (e.est ? "est" : "") + (stopped ? " stop" : "") + (e.nosig ? " nosig" : "");
+    if (tr.estShown !== cls) { const el = tr.marker.getElement(); const mk = el && el.querySelector(".busmk"); if (mk) { mk.classList.toggle("est", e.est); mk.classList.toggle("stop", stopped); mk.classList.toggle("nosig", !!e.nosig); tr.estShown = cls; } }
   }
 }
 function updateStaleMarkers() { for (const tr of Track.values()) tr.estShown = null; updateMarkers(performance.now()); }
@@ -1678,16 +1767,18 @@ function renderArrivals() {
 function drawArrivalBuses() {
   const items = [], seen = new Set(), stop = S.stopsCache[S.view.id], stale = isStale();
   for (const a of S.arrivals) {
-    const ts = a.tripStatus; if (!ts || !ts.position || !ts.position.lat || !arrTime(a).live) continue;
+    const ts = a.tripStatus; if (!ts || !arrTime(a).live) continue;
+    // GPS real primero: en Cuándo SUBO `position` (y distanceAlongTrip/orientation) salen del HORARIO.
+    const pos = [ts.lastKnownLocation, ts.position].find(p => p && p.lat && p.lon); if (!pos) continue;
     const r = routeOf(a.routeId, a.routeShortName);
     if (S.stopFilter && lineKey(r) !== S.stopFilter) continue;
     const id = a.vehicleId || a.tripId;           // por interno: dos unidades del mismo viaje no se pisan
     if (seen.has(id)) continue; seen.add(id);
     const loc = locTime(ts);
-    // Si se acerca a esta parada, no extrapolar más allá de ella (dejamos 15 m).
-    const maxAhead = a.distanceFromStop > 0 && stop ? Math.min(a.distanceFromStop, dist([ts.position.lat, ts.position.lon], [stop.lat, stop.lon]) + 30) - 15 : NaN;
-    items.push({ id, tripId: a.tripId, vehicleId: a.vehicleId || "", routeId: a.routeId, lat: ts.position.lat, lon: ts.position.lon, t: loc || now(), bearing: ts.orientation,
-      old: (loc && now() - loc > 180000) || stale, z: S.sel === a.tripId ? 900 : 500, maxAhead,
+    // No extrapolar más allá de esta parada (15 m antes): se calcula sobre el recorrido en estimate().
+    const stopLL = stop && Number.isFinite(stop.lat) ? [stop.lat, stop.lon] : null;
+    items.push({ id, tripId: a.tripId, vehicleId: a.vehicleId || "", routeId: a.routeId, lat: pos.lat, lon: pos.lon, t: loc || now(), bearing: ts.orientation,
+      old: (loc && now() - loc > 180000) || stale, z: S.sel === a.tripId ? 900 : 500, stopLL,
       tip: `${esc(routeLabel(r))} → ${esc(a.tripHeadsign || "")}` });
     ensureRoutePoly(a.routeId);
   }
@@ -1973,7 +2064,7 @@ function openSettings() {
     <label class="f" for="sRRef">Refresco en la vista de línea (segundos)</label><input id="sRRef" type="number" min="1" max="600" step="1" inputmode="numeric" value="${esc(st.routeRefresh)}"><div class="hint" id="hRRef"></div>
     <label class="f" for="sLRef">Refresco del mapa en vivo (segundos)</label><input id="sLRef" type="number" min="1" max="600" step="1" inputmode="numeric" value="${esc(st.liveRefresh || DEFAULTS.liveRefresh)}"><div class="hint" id="hLRef"></div>
     <label class="chk"><input id="sInterp" type="checkbox" ${st.interp ? "checked" : ""}> Mover los bondis entre consultas (interpolación)</label>
-    <div class="small muted" style="margin:2px 2px 0">Estima la posición con la velocidad de los últimos fixes, sobre el recorrido, hasta 30 s. El bondi se ve más claro y con borde punteado cuando la posición es estimada.</div>
+    <div class="small muted" style="margin:2px 2px 0">Estima la posición con la velocidad reciente (mediana de los últimos fixes, o el modelo), sobre el recorrido y esperando en las paradas, hasta ~1,5 min después de cada lectura nueva. El bondi se ve más claro y con borde punteado cuando la posición es estimada; gris y "sin señal" si no hay GPS nuevo hace más de 5 min.</div>
     <label class="chk"><input id="sHeading" type="checkbox" ${st.headingUp ? "checked" : ""}> Brújula: permitir “rumbo arriba”</label>
     <div class="small muted" style="margin:2px 2px 0">Con esto prendido, tocar la brújula alterna <b>norte arriba</b> ↔ <b>rumbo arriba</b> (el mapa gira según hacia dónde mira el celu; si no hay brújula, con el rumbo del GPS al moverte). El mapa se gira siempre con dos dedos, o Shift + arrastrar / ⟲ ⟳ en la compu.</div>
     <label class="chk"><input id="sModel" type="checkbox" ${st.useModel !== false ? "checked" : ""}> Usar lo aprendido con “Estoy en este bondi”</label>
@@ -2038,7 +2129,7 @@ async function testConn() {
 /* ----------------------------- arranque -------------------------- */
 // Hook para pruebas (solo lectura del estado).
 window.__b2 = { SM, smLoad, MR, HD, startFollow, stopFollow, applyHeading, updCompass, fitVisible, S, P, Track, trackFor, isTrainTarget, lineBase, lineKey, stopDir, stopDirText, centerVisible, visibleCenter, sheetPx, topInset, setSheet, showHostNote, loadLive,
-  get sheetState() { return sheetState; }, estimate, isStale, DEFAULTS, AUTH_SCHEME, authHeader, map, TR, TM, TRAIN, segAt, modelSpeed, lagMs, pointAt, project, trainStart, trainEnd, trainOnPhone, trainOnObaFix, trainStats };
+  get sheetState() { return sheetState; }, estimate, isStale, DEFAULTS, AUTH_SCHEME, authHeader, map, TR, TM, TRAIN, segAt, modelSpeed, lagMs, pointAt, project, trainStart, trainEnd, trainOnPhone, trainOnObaFix, trainStats, addFix, computeVel, prepPoly, syncBuses, updateMarkers };
 (async function boot() {
   // Sesión de entrenamiento que quedó abierta (recarga de la página): se retoma si tiene < 3 h.
   const ts = ls("trainSession");
