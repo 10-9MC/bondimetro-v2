@@ -245,7 +245,7 @@ label.f{display:block;margin:12px 2px 4px;font-size:13px;color:var(--mut)}
    Bondímetro v2 — cliente OneBusAway para el backend de Cuándo SUBO
    Cambios vs v1: ver README.md / CHANGELOG.md.
    ================================================================ */
-const APP_VER = "2.3.1";
+const APP_VER = "2.3.2";
 const NS = "bondi2.";   // prefijo de localStorage (v1 usa "bondi." en el mismo origen: no pisarlo)
 
 const DEFAULTS = {
@@ -883,8 +883,9 @@ function estimate(tr, T) {
   d = Math.min(d, cap);
   if (d < 1) return base;
   if (v.poly) { const al = v.along + d * v.sign, q = pointAt(v.poly, al); return { p: q.p, est: true, moved: d, hd: v.sign > 0 ? q.hd : q.hd + 180, src, poly: v.poly, along: al, sign: v.sign }; }
-  const o = toXY([f.lat, f.lon], f.lat);
-  return { p: fromXY(o[0] + v.ux * d, o[1] + v.uy * d, f.lat), est: true, moved: d, hd: v.hd, src };
+  // 2.3.2: sin recorrido NO se extrapola en línea recta (en las curvas de la costa terminaba en el lago):
+  // se queda en el último GPS real.
+  return Object.assign(base, { hd: v.hd != null ? v.hd : null });
 }
 // items: [{ id (vehicleId||tripId), tripId, vehicleId, routeId, lat, lon, t, bearing, old, faded, z, tip, label, stopLL }]
 function syncBuses(items) {
@@ -920,7 +921,7 @@ function syncBuses(items) {
           if (ps.off < 30 && back > 0 && back < 300) tr.hold = { poly: e.poly, along: ps.along, sign: e.sign, until: now() + 90000 };
         }
         if (REDUCE_MOTION || far) { tr.anim = null; tr.hold = null; tr.marker.setLatLng(e.p); tr.shown = e.p; }
-        else if (!tr.hold) tr.anim = { from: tr.shown, t0: performance.now() };
+        else if (!tr.hold) tr.anim = animFrom(tr, e, performance.now());
         else tr.anim = null;
       }
     }
@@ -932,6 +933,14 @@ function syncBuses(items) {
   updateMarkers(performance.now());
   kickAnim();
 }
+// 2.3.2: la corrección suave va SOBRE el recorrido cuando lo mostrado y lo nuevo están en la misma polilínea.
+// Si no, sólo se desliza en línea recta si es corto (≤ ANIM_CHORD_M); un salto largo en cuerda cruzaba el lago.
+const ANIM_CHORD_M = 120;
+function animFrom(tr, e, t0) {
+  if (e.poly && tr.shown) { const ps = project(e.poly, tr.shown); if (ps.off < 30) return { from: tr.shown, t0, poly: e.poly, al: ps.along }; }
+  if (!tr.shown || dist(tr.shown, e.p) > ANIM_CHORD_M) return { from: tr.shown, t0, snap: true };
+  return { from: tr.shown, t0 };
+}
 function updateMarkers(pt) {
   const T = now();
   for (const tr of Track.values()) {
@@ -940,12 +949,15 @@ function updateMarkers(pt) {
     if (tr.hold) {
       const h = tr.hold;
       if (e.est && e.poly === h.poly && (e.along - h.along) * h.sign < 0 && T < h.until) p = pointAt(h.poly, h.along).p;
-      else { tr.hold = null; if (dist(tr.shown, p) > 1) tr.anim = { from: tr.shown, t0: pt }; }
+      else { tr.hold = null; if (dist(tr.shown, p) > 1) tr.anim = animFrom(tr, e, pt); }
     }
     if (tr.anim) {
       const k = Math.min(1, (pt - tr.anim.t0) / ANIM_MS), ease = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
-      p = [tr.anim.from[0] + (p[0] - tr.anim.from[0]) * ease, tr.anim.from[1] + (p[1] - tr.anim.from[1]) * ease];
-      if (k >= 1) tr.anim = null;
+      const A = tr.anim;
+      if (A.poly && e.poly === A.poly) p = pointAt(A.poly, A.al + (e.along - A.al) * ease).p;   // por la calle, no en cuerda
+      else if (A.poly || A.snap) p = p;                                                           // cambió de recorrido: sin cuerda
+      else p = [A.from[0] + (p[0] - A.from[0]) * ease, A.from[1] + (p[1] - A.from[1]) * ease];
+      if (k >= 1 || (A.poly && e.poly !== A.poly)) tr.anim = null;
     }
     tr.marker.setLatLng(p); tr.shown = p;
     const stopped = !!(tr.vel && tr.vel.speed === 0);
@@ -2128,7 +2140,7 @@ async function testConn() {
 
 /* ----------------------------- arranque -------------------------- */
 // Hook para pruebas (solo lectura del estado).
-window.__b2 = { SM, smLoad, MR, HD, startFollow, stopFollow, applyHeading, updCompass, fitVisible, S, P, Track, trackFor, isTrainTarget, lineBase, lineKey, stopDir, stopDirText, centerVisible, visibleCenter, sheetPx, topInset, setSheet, showHostNote, loadLive,
+window.__b2 = { animFrom, SM, smLoad, MR, HD, startFollow, stopFollow, applyHeading, updCompass, fitVisible, S, P, Track, trackFor, isTrainTarget, lineBase, lineKey, stopDir, stopDirText, centerVisible, visibleCenter, sheetPx, topInset, setSheet, showHostNote, loadLive,
   get sheetState() { return sheetState; }, estimate, isStale, DEFAULTS, AUTH_SCHEME, authHeader, map, TR, TM, TRAIN, segAt, modelSpeed, lagMs, pointAt, project, trainStart, trainEnd, trainOnPhone, trainOnObaFix, trainStats, addFix, computeVel, prepPoly, syncBuses, updateMarkers };
 (async function boot() {
   // Sesión de entrenamiento que quedó abierta (recarga de la página): se retoma si tiene < 3 h.
